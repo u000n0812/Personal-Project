@@ -1,0 +1,66 @@
+# ============================================================
+# Commodity Quant - 설정 파일
+# ============================================================
+
+# 추적 대상 원자재 (yfinance 심볼 기준)
+# 자산군별로 묶어서 관리한다.
+assets:
+  energy:
+    CL=F: "WTI 원유"
+    BZ=F: "Brent 원유"
+    NG=F: "천연가스"
+  precious_metals:
+    GC=F: "금"
+    SI=F: "은"
+  industrial_metals:
+    HG=F: "구리"
+  agriculture:
+    ZC=F: "옥수수"
+    ZW=F: "밀"
+    ZS=F: "대두"
+
+# 데이터 소스: "yfinance" | "csv" | "synthetic"
+#  - yfinance  : Yahoo Finance 온라인 수집 (네트워크 allowlist 필요)
+#  - csv       : data/ 디렉터리의 <symbol>.csv 사용
+#  - synthetic : 네트워크 없이 합성 데이터 생성 (오프라인 데모/테스트용)
+data:
+  source: synthetic
+  start: "2018-01-01"
+  end: null              # null 이면 오늘까지
+  csv_dir: "data"
+  cache_dir: "data/cache"
+  synthetic_days: 1500   # synthetic 모드에서 생성할 일수
+
+# 피처 엔지니어링
+features:
+  ma_windows: [5, 10, 20, 60]
+  rsi_period: 14
+  vol_window: 20
+
+# 예측 설정
+forecast:
+  target: log_return     # 모델이 예측하는 대상 (현재는 log_return)
+  horizon: 1             # 며칠 앞을 예측할지 (1 = 다음 거래일)
+
+# 백테스트(워크-포워드) 설정
+backtest:
+  test_size: 120         # 마지막 N개 거래일을 검증 구간으로 사용
+  refit_every: 5         # 모델을 며칠마다 재학습할지 (속도/정확도 trade-off)
+
+# 사용할 모델 목록 (등록된 이름)
+#  naive, arima, garch, xgboost, lstm
+models:
+  - naive
+  - arima
+  - garch
+  - xgboost
+  # - lstm   # torch 설치 시 활성화
+
+# LSTM 하이퍼파라미터 (선택)
+lstm:
+  lookback: 20
+  hidden_size: 32
+  epochs: 30
+  lr: 0.001
+
+output_dir: "outputs"
