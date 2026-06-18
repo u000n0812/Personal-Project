@@ -63,4 +63,28 @@ lstm:
   epochs: 30
   lr: 0.001
 
+# ============================================================
+# 금(Gold) 매크로 트레이딩 전략
+#   금 = f( 실질금리, 달러 신뢰 ) 두 매크로 신호를 합쳐 매수/매도 결정
+# ============================================================
+gold_strategy:
+  gold_symbol: "GC=F"           # 금 선물 (또는 GLD ETF)
+  # 실질금리 프록시. yfinance 에는 실질금리 직접 시계열이 없어 10Y 국채금리(^TNX)를 기본 프록시로 사용.
+  # 진짜 실질금리(FRED DFII10)를 쓰려면 source=csv 로 data/_TNX.csv 등에 넣어 교체할 수 있다.
+  real_rate_symbol: "^TNX"
+  dollar_symbol: "DX-Y.NYB"     # ICE 달러 인덱스 (대안: DX=F, UUP)
+
+  signal:
+    lookback: 60                # z-score 산출 윈도우(거래일)
+    momentum_window: 10         # 추세(모멘텀) 계산 윈도우
+    level_weight: 0.4           # 신호 내 '수준' 비중
+    momentum_weight: 0.6        # 신호 내 '모멘텀' 비중
+    weight_real_rate: 0.5       # 실질금리 신호 가중
+    weight_dollar: 0.5          # 달러 신호 가중
+    entry_threshold: 0.4        # |표준화 점수| 이 값 초과 시 진입
+    allow_short: true           # true: 매도=숏, false: 매도=현금보유
+
+  backtest:
+    cost_bps: 1.0               # 포지션 변경 시 거래비용(편도, bps)
+
 output_dir: "outputs"

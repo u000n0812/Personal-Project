@@ -46,6 +46,48 @@ python scripts/run_pipeline.py --source yfinance
 - `next_day_forecast.csv` — 최우수 모델 기반 다음 거래일 예측
 - `<symbol>.png` — 가격 + 누적 예측 수익률 비교 그래프
 
+## 금(Gold) 매크로 트레이딩 전략 ⭐
+
+금 가격을 움직이는 **두 핵심 매크로 동인**을 신호로 결합하여 매수/매도를 결정합니다.
+
+| 동인 | 데이터 (yfinance) | 금과의 관계 | 매수 신호 |
+|------|------------------|-------------|-----------|
+| **실질금리** | `^TNX` (10Y 국채금리 프록시) | 음(-) — 금은 무이자 자산 | 실질금리 **하락/저수준** |
+| **달러 신뢰** | `DX-Y.NYB` (달러 인덱스) | 음(-) — 금은 달러 대체자산 | 달러 **약세** |
+
+**알고리즘**
+1. 각 동인을 *수준(level)* 과 *모멘텀(momentum)* 의 z-score 로 표준화 (둘 다 금과 음의 관계라 부호 반전)
+2. 가중 합산 → 합성 점수(`score`)를 자체 변동성으로 표준화
+3. `score > 임계값` → **매수(LONG)**, `score < -임계값` → **매도/숏(SHORT)**, 그 사이 → **관망**
+4. 워크-포워드로 손익 계산 (어제 신호 → 오늘 수익률, look-ahead 없음), 거래비용 반영
+5. Sharpe·MDD·승률을 **Buy & Hold 와 비교**
+
+```bash
+python scripts/run_gold_strategy.py                 # 기본(synthetic) — 즉시 실행
+python scripts/run_gold_strategy.py --source yfinance   # 실데이터 (allowlist 필요)
+python scripts/run_gold_strategy.py --no-short          # 숏 금지(매도=현금)
+```
+
+출력 예시(합성 데이터):
+```
+=== 금 매크로 전략 백테스트 ===
+전략         | 연수익 +16.24% | 변동성 11.71% | Sharpe 1.39 | MDD -13.03% | 누적 +152.13%
+Buy&Hold     | 연수익  +4.38% | 변동성 13.90% | Sharpe 0.31 | MDD -35.96% | 누적  +22.50%
+
+=== 현재 매매 권고 ===
+실질금리 신호 +1.41 / 달러 신호 +0.21 / 합성 점수 +0.82
+>>> 결정: 매수 (BUY / LONG)
+```
+
+산출물: `outputs/gold_strategy.png`(가격+매매시점+금리/달러+자산곡선), `outputs/gold_strategy_backtest.csv`
+
+> **실질금리에 관한 메모**: yfinance 에는 실질금리(TIPS) 시계열이 없어 10Y 명목금리(`^TNX`)를
+> 기본 프록시로 사용합니다. 신호는 z-score/모멘텀 기반이라 스케일에 영향받지 않습니다.
+> 진짜 실질금리(FRED **DFII10**)를 쓰려면 해당 CSV 를 `data/` 에 넣고 `config.yaml` 의
+> `gold_strategy.real_rate_symbol` 을 바꾼 뒤 `--source csv` 로 실행하세요.
+
+설정은 `config.yaml` 의 `gold_strategy` 섹션에서 가중치·임계값·거래비용 등을 조정합니다.
+
 ## 데이터 소스 설정
 
 `config.yaml` 의 `data.source` 로 전환합니다.
@@ -83,6 +125,8 @@ src/commodity_quant/
 ├── backtest/
 │   ├── evaluator.py     # 워크-포워드 엔진
 │   └── metrics.py       # 성능 지표 (방향 적중률, QLIKE 등)
+├── strategy/
+│   └── gold_macro.py    # 금=f(실질금리, 달러) 매크로 트레이딩 전략 ⭐
 └── pipeline.py          # 적재→피처→백테스트→비교→예측→그래프
 ```
 
