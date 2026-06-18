@@ -32,7 +32,15 @@ def _from_yfinance(symbol: str, start: str | None, end: str | None) -> pd.DataFr
 
     df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=True)
     if df is None or df.empty:
-        raise RuntimeError(f"yfinance 에서 '{symbol}' 데이터를 받지 못했습니다 (네트워크/심볼 확인).")
+        raise RuntimeError(
+            f"yfinance 에서 '{symbol}' 데이터를 받지 못했습니다.\n"
+            "  - 가장 흔한 원인: 실행 환경의 네트워크 egress allowlist 에 Yahoo 호스트가 없음.\n"
+            "    다음 호스트를 환경 네트워크 설정에 추가하세요:\n"
+            "      query1.finance.yahoo.com, query2.finance.yahoo.com,\n"
+            "      finance.yahoo.com, fc.yahoo.com\n"
+            "  - 또는 네트워크를 못 쓰는 환경이면 data.source 를 'csv'/'synthetic' 으로 변경하세요.\n"
+            "  - 연결 점검: python scripts/check_network.py"
+        )
     # yfinance 가 MultiIndex 컬럼을 줄 수 있으므로 평탄화
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
