@@ -1,0 +1,8 @@
+streamlit>=1.40
+pandas>=2.1
+numpy>=1.26
+plotly>=5.20
+python-dotenv>=1.0
+# PyKis — KIS Open API wrapper (import name: `pykis`). Only needed for live
+# mode; the app runs fully on synthetic data without it.
+python-kis>=2.0

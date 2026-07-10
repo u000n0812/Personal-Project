@@ -1,0 +1,17 @@
+# Secrets — never commit credentials
+.env
+.streamlit/secrets.toml
+*.token
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Tooling
+.ipynb_checkpoints/
+.pytest_cache/
+.DS_Store
