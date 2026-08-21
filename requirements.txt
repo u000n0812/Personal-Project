@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# 사내 지침 챗봇 (Local RAG) - Python 의존성
+#
+# 모든 패키지는 로컬에서 동작하며 외부 AI API를 호출하지 않는다.
+# 설치: pip install -r requirements.txt
+# ---------------------------------------------------------------------------
+
+# 필수 (핵심 기능)
+numpy>=1.24
+streamlit>=1.32
+sentence-transformers>=2.7
+pypdf>=4.2
+python-docx>=1.1
+
+# 선택 (없어도 동작하지만 있으면 기능이 늘어남)
+faiss-cpu>=1.8 ; platform_machine != "arm64"   # 없으면 numpy 브루트포스 검색으로 자동 대체
+openpyxl>=3.1                                   # XLSX 지원
+python-pptx>=0.6.23                             # PPTX 지원
+
+# 개발/테스트용
+pytest>=8.0

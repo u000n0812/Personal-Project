@@ -1,0 +1,36 @@
+{
+  "_comment": "Phase 10 최종 테스트용 질문 세트. expect 는 답변 근거가 있어야 하는 문서, 'none' 은 등록된 문서에 없는 질문(답변 거부가 정답).",
+  "documents": {
+    "external": "External Data Transfer Specification",
+    "dblock": "Database Lock Guideline",
+    "sop": "SOP DataManagement"
+  },
+  "questions": [
+    {"question": "External Data 전달 절차가 어떻게 되었지?", "expect": "external"},
+    {"question": "파일을 Vendor에게 전달할 때 암호화 규칙이 어떻게 돼?", "expect": "external"},
+    {"question": "External Data 전달할 때 Password는 어떻게 보내야 해?", "expect": "external"},
+    {"question": "Password 길이 규칙이 어떻게 되지?", "expect": "external"},
+    {"question": "외부 데이터 전달은 누구에게 승인을 받아야 해?", "expect": "external"},
+    {"question": "정식 전달 전에 Test Transfer를 꼭 해야 하나?", "expect": "external"},
+    {"question": "데이터 전달할 때 USB를 사용해도 되나?", "expect": "external"},
+    {"question": "전달 파일명 명명 규칙이 어떻게 되지?", "expect": "external"},
+    {"question": "전달된 파일이 손상되면 어떻게 처리해?", "expect": "external"},
+    {"question": "DB Lock 전에 확인해야 하는 항목이 뭐였지?", "expect": "dblock"},
+    {"question": "DBL 승인은 누구에게 받아야 해?", "expect": "dblock"},
+    {"question": "Database Lock 이후에 데이터를 수정하려면 어떻게 해?", "expect": "dblock"},
+    {"question": "Soft Lock과 Hard Lock의 차이가 뭐야?", "expect": "dblock"},
+    {"question": "SAE Reconciliation은 언제 확인해?", "expect": "dblock"},
+    {"question": "Lock 이후에 데이터 추출은 어떻게 해야 해?", "expect": "dblock"},
+    {"question": "Unlock 요청서에는 뭘 적어야 해?", "expect": "dblock"},
+    {"question": "DMP는 언제 작성해야 하지?", "expect": "sop"},
+    {"question": "Data Management Plan 승인 절차 알려줘", "expect": "sop"},
+    {"question": "Query 응답 기한이 며칠이야?", "expect": "sop"},
+    {"question": "CRF 설계는 언제까지 완료해야 해?", "expect": "sop"},
+    {"question": "프로젝트 문서는 몇 년 보관해?", "expect": "sop"},
+    {"question": "신규 담당자 교육 기록은 어디에 보관해?", "expect": "sop"},
+    {"question": "구내식당 점심 메뉴는 어떻게 신청해?", "expect": "none"},
+    {"question": "연차 휴가 신청은 어디서 해?", "expect": "none"},
+    {"question": "법인카드 사용 한도가 얼마야?", "expect": "none"},
+    {"question": "사무실 주차 등록 절차 알려줘", "expect": "none"}
+  ]
+}

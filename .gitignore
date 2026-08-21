@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.streamlit/secrets.toml
+
+# 사용자 데이터(문서 원본, 인덱스, DB, 로그, 백업)는 절대 커밋하지 않는다.
+data/
+!data/.gitkeep
+models/

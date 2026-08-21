@@ -1,0 +1,16 @@
+# Streamlit 은 반드시 127.0.0.1 에만 Binding 한다 (요구사항 13).
+[server]
+address = "127.0.0.1"
+port = 8501
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+fileWatcherType = "none"
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false
+serverAddress = "127.0.0.1"
+
+[theme]
+base = "light"
