@@ -1,0 +1,15 @@
+# 로컬 전용 실행 설정 (외부 접근 차단)
+[server]
+address = "127.0.0.1"     # 0.0.0.0으로 바꾸지 말 것 (외부 노출 금지)
+port = 8501
+headless = true
+enableCORS = true          # 브라우저의 타 사이트에서 로컬 앱 접근 차단
+enableXsrfProtection = true
+maxUploadSize = 200        # MB
+
+[browser]
+gatherUsageStats = false   # 사용 통계 외부 전송 금지
+serverAddress = "127.0.0.1"
+
+[theme]
+base = "light"

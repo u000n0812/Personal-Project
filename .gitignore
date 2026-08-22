@@ -1,0 +1,17 @@
+# 사용자 데이터 (문서, Index, DB, 로그) — 절대 저장소에 올리지 않는다
+data/
+backup/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# OS / 편집기
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,41 @@
+# Database Lock Procedure
+
+1. 목적
+본 지침은 임상시험 데이터베이스 잠금(Database Lock, DBL) 절차와 사전 확인 항목을 정의한다.
+
+2. 용어
+Database Lock(DBL, DB Lock)은 통계 분석을 위해 데이터베이스의 추가 수정을 차단하는 절차를 말한다.
+Soft Lock은 제한된 권한으로만 수정이 가능한 상태를 말한다.
+
+3. DB Lock 사전 확인 항목
+3.1 데이터 확인
+모든 CRF 페이지가 입력 완료되었는지 확인한다.
+미해결 Query가 0건인지 확인한다.
+SAE와 EDC 데이터 간 Reconciliation이 완료되었는지 확인한다.
+External Data(중앙검사실, ePRO)의 최종 수신 및 대조가 완료되었는지 확인한다.
+Protocol Deviation 목록이 최종 확정되었는지 확인한다.
+Coding(MedDRA, WHO-DD)이 완료되고 검토되었는지 확인한다.
+
+3.2 문서 확인
+Data Management Plan의 최신 버전이 승인되었는지 확인한다.
+Data Validation Specification에 정의된 모든 Edit Check가 수행되었는지 확인한다.
+Data Review Meeting 회의록이 작성되고 서명되었는지 확인한다.
+
+4. 승인 절차
+DB Lock 체크리스트는 Data Manager가 작성한다.
+작성된 체크리스트는 Biostatistician과 Medical Monitor가 검토한다.
+최종 승인은 Project Manager가 수행하며, 승인 없이 Lock을 진행할 수 없다.
+승인 기록은 전자서명 또는 서명된 PDF 형태로 보관한다.
+
+5. Lock 수행
+Database Administrator는 승인된 요청서를 근거로 시스템 권한을 읽기 전용으로 변경한다.
+Lock 수행 일시와 수행자를 Audit Trail에 기록한다.
+Lock 완료 후 Data Manager는 관련자에게 완료를 공지한다.
+
+6. Unlock
+Lock 이후 데이터 수정이 필요한 경우 Unlock 요청서를 작성한다.
+Unlock은 Project Manager와 Sponsor의 승인을 받은 경우에만 수행한다.
+Unlock 사유, 수정 내용, 재Lock 일시를 모두 기록한다.
+
+7. 기록 보관
+DB Lock 체크리스트, 승인 기록, Audit Trail은 과제 종료 후 10년간 보관한다.

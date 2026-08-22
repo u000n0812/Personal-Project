@@ -1,0 +1,19 @@
+# 사내 지침문서 어시스턴트 - Python 의존 라이브러리
+# 모든 처리는 로컬에서 수행되며 외부 AI API 라이브러리는 포함하지 않는다.
+
+# --- UI ---
+streamlit>=1.30
+
+# --- 문서 텍스트 추출 ---
+pypdf>=4.0            # PDF
+python-docx>=1.1      # DOCX
+openpyxl>=3.1         # XLSX (선택)
+python-pptx>=0.6.23   # PPTX (선택)
+
+# --- Embedding / 계산 ---
+numpy>=1.24
+sentence-transformers>=2.6   # 로컬 multilingual Embedding 모델 실행
+# faiss-cpu>=1.8             # (선택) 문서 수가 매우 많을 때 검색 가속
+
+# 로컬 LLM(Ollama)은 pip 패키지가 아니라 별도 프로그램으로 설치한다.
+# https://ollama.com  (설치 후 오프라인에서 동작)

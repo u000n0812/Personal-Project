@@ -1,0 +1,49 @@
+# External Data Transfer Specification
+
+1. 목적
+본 지침은 외부 기관(External Data Provider)으로부터 데이터를 수신하거나 외부로 데이터를 전달할 때 준수해야 하는 절차를 정의한다.
+
+2. 적용 범위
+임상시험 및 연구 과제에서 발생하는 모든 External Data(중앙검사실 데이터, ePRO 데이터, 영상 데이터)에 적용한다.
+
+3. 역할과 책임
+Data Manager는 External Data 수신 계획을 수립하고 전달 일정을 관리한다.
+Data Provider는 합의된 규격에 따라 데이터 파일을 생성하고 전달한다.
+Project Manager는 데이터 전달 개시 전 Data Transfer Agreement를 승인한다.
+QA 담당자는 전달 이력과 점검 기록을 검토한다.
+
+4. 사전 준비
+4.1 Data Transfer Agreement
+데이터 전달 전에 Data Transfer Agreement(DTA)를 작성하고 Project Manager 승인을 받는다.
+DTA에는 파일 규격, 전달 주기, 담당자 연락처, 오류 처리 방법을 포함한다.
+
+4.2 Test Transfer
+정식 전달 전에 최소 1회 Test Transfer를 수행하여 파일 규격과 복호화 가능 여부를 확인한다.
+Test Transfer 결과는 Data Management File에 보관한다.
+
+5. 데이터 전달 절차
+5.1 전달 방식
+데이터는 회사가 지정한 Secure File Transfer System(SFTS)을 통해 전달한다.
+개인 이메일 계정, 개인 클라우드 저장소, USB 매체를 이용한 전달은 금지한다.
+
+5.2 파일 명명 규칙
+파일명은 [과제코드]_[데이터종류]_[YYYYMMDD]_[버전] 형식으로 작성한다.
+예: ABC123_LAB_20240115_v1.
+
+5.3 Data Transfer
+Data Provider는 전달 파일을 반드시 암호화한다.
+암호화는 AES-256 방식의 압축 암호화를 사용한다.
+Password는 파일과 같은 경로로 보내지 않으며, 반드시 별도의 Email로 전달한다.
+Password는 최소 12자 이상이며 영문 대소문자, 숫자, 특수문자를 포함한다.
+전달 완료 후 Data Manager는 수신 확인 메일을 24시간 이내에 회신한다.
+
+5.4 수신 확인
+Data Manager는 수신 파일의 건수, 파일 크기, 체크섬을 Transfer Log와 대조한다.
+불일치가 발견되면 재전송을 요청하고 Discrepancy Log에 기록한다.
+
+6. 오류 처리
+전달 오류가 발생하면 Data Manager는 24시간 이내에 Data Provider에게 통보한다.
+동일 오류가 3회 이상 반복되면 Project Manager에게 보고하고 DTA를 재검토한다.
+
+7. 기록 보관
+Transfer Log, 수신 확인 기록, Discrepancy Log는 과제 종료 후 10년간 보관한다.
