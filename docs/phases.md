@@ -15,8 +15,18 @@
 | 8 | 문서 관리 (추가/삭제/재색인/버전) | `app/pipeline.py` | `pytest tests/test_pipeline.py` |
 | 9 | 보안 검증 (외부 통신 차단) | `app/netguard.py`, `app/logging_setup.py` | `python scripts/check_offline.py`, `pytest tests/test_security.py` |
 | 10 | 최종 테스트 (질문 26개) | `docs/test_questions.json` | `python scripts/evaluate.py`, `pytest tests/test_evaluation.py` |
+| - | 원클릭 설치 (설치 자동화) | `설치.bat`, `setup.sh`, `scripts/setup.py` | `pytest tests/test_setup.py` |
 
 ## Phase 1 을 통과하는 최소 조건
+
+원클릭 설치를 쓰면 아래가 자동으로 수행된다.
+
+```bat
+설치.bat          :: Windows
+./setup.sh        :: macOS / Linux
+```
+
+직접 확인하려면:
 
 ```bat
 ollama serve
