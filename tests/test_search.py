@@ -4,8 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sopbot.config import DEFAULT_SYNONYMS
+from sopbot.config import DEFAULT_SYNONYMS, Settings
+from sopbot.db import Database
 from sopbot.embed import HashingEmbedder
+from sopbot.search import Retriever
 from sopbot.keyword import KeywordIndex, coverage, expand_query, tokenize
 from sopbot.vectorstore import VectorStore
 
@@ -92,3 +94,26 @@ class VectorStoreTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ThresholdTest(unittest.TestCase):
+    """Embedding 모델마다 유사도 분포가 다르므로 threshold가 모델을 따라가야 한다."""
+
+    def _retriever(self, settings: Settings) -> Retriever:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        return Retriever(
+            Database(root / "t.sqlite3"),
+            VectorStore(root / "index"),
+            HashingEmbedder(64),
+            settings,
+        )
+
+    def test_auto_threshold_follows_embedder(self):
+        retriever = self._retriever(Settings(score_threshold=0.0))
+        self.assertAlmostEqual(retriever.effective_threshold, 0.30)
+
+    def test_explicit_threshold_wins(self):
+        retriever = self._retriever(Settings(score_threshold=0.62))
+        self.assertAlmostEqual(retriever.effective_threshold, 0.62)

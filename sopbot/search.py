@@ -169,6 +169,14 @@ class Retriever:
         return results
 
     # ------------------------------------------------------------------
+    @property
+    def effective_threshold(self) -> float:
+        """설정값이 0(자동)이면 Embedding 모델의 권장 threshold를 사용한다."""
+        configured = float(self.settings.score_threshold or 0.0)
+        if configured > 0:
+            return configured
+        return float(getattr(self.embedder, "suggested_threshold", 0.4))
+
     def evidence_scores(self, query: str, results: list[SearchResult]) -> tuple[float, float]:
         """(최고 vector 유사도, 질문 단어 커버리지)를 계산한다."""
         if not results:
@@ -188,7 +196,7 @@ class Retriever:
             return False
         best_vector, token_coverage = self.evidence_scores(query, results)
         return (
-            best_vector >= self.settings.score_threshold
+            best_vector >= self.effective_threshold
             or token_coverage >= self.settings.min_keyword_coverage
         )
 

@@ -31,8 +31,15 @@ from sopbot.service import AppService  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 
-def _service() -> AppService:
-    return AppService(Settings.load())
+def _service(warn: bool = True) -> AppService:
+    service = AppService(Settings.load())
+    if warn and service.ingestor.embedding_model_changed():
+        print(
+            f"[경고] Vector Index는 '{service.store.embedder_name}' 로 만들어졌지만 "
+            f"현재 '{service.embedder.name}' 가 사용 중입니다.\n"
+            "        Ollama 실행 여부를 확인하거나 `python cli.py rebuild` 를 실행하세요.\n"
+        )
+    return service
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +184,80 @@ def cmd_selfcheck(args: argparse.Namespace) -> int:
     return 0
 
 
+# 관련 문장 / 무관한 문장 쌍으로 Embedding 모델의 분별력을 확인한다.
+EMBED_PROBES = [
+    (
+        "DB Lock 전에 확인해야 하는 항목이 뭐야?",
+        "Database Lock 이전에 미해결 Query가 0건인지 확인하고 SAE Reconciliation 완료 여부를 확인한다.",
+        "법인카드 사용 한도는 부서장 승인 후 월 200만원까지 인정된다.",
+    ),
+    (
+        "외부에 파일 보낼 때 암호화 규칙이 어떻게 돼?",
+        "전달 파일은 AES-256으로 암호화하고 Password는 별도의 Email로 전달한다.",
+        "구내식당 점심 운영 시간은 11시 30분부터 13시까지이다.",
+    ),
+    (
+        "이 업무는 누구에게 승인을 받아야 해?",
+        "최종 승인은 Project Manager가 수행하며 승인 없이 진행할 수 없다.",
+        "연차 휴가는 사용 3일 전까지 신청한다.",
+    ),
+    (
+        "지침문서 교육은 언제까지 받아야 해?",
+        "개정 문서는 효력 발생일로부터 30일 이내에 담당자 교육을 실시한다.",
+        "주차 등록은 총무팀에 차량 번호를 제출하면 된다.",
+    ),
+    (
+        "DBL 승인 절차 알려줘",
+        "DB Lock 체크리스트는 Data Manager가 작성하고 Project Manager가 최종 승인한다.",
+        "사내 동호회 지원금은 반기별로 지급된다.",
+    ),
+]
+
+
+def cmd_embed_check(args: argparse.Namespace) -> int:
+    """Embedding 모델이 관련 문장과 무관한 문장을 구분하는지 확인한다."""
+    service = _service(warn=False)
+    embedder = service.embedder
+    print(f"Embedding backend : {embedder.name} (dim={embedder.dimension})")
+    if embedder.name.startswith("hashing"):
+        print("[경고] 모델을 찾지 못해 fallback(hashing)이 사용 중입니다.")
+        print("       Ollama 실행 여부와 `ollama pull bge-m3` 설치를 확인하세요.\n")
+
+    def cosine(a, b):
+        return sum(x * y for x, y in zip(a, b))
+
+    related_scores, unrelated_scores = [], []
+    print(f"\n{'질문':38} {'관련 문장':>9} {'무관 문장':>9} {'차이':>7}")
+    print("-" * 70)
+    for question, related, unrelated in EMBED_PROBES:
+        query_vector = embedder.encode_query(question)
+        related_vector, unrelated_vector = embedder.encode_documents([related, unrelated])
+        related_score = cosine(query_vector, related_vector)
+        unrelated_score = cosine(query_vector, unrelated_vector)
+        related_scores.append(related_score)
+        unrelated_scores.append(unrelated_score)
+        display = question if len(question) <= 36 else question[:35] + "…"
+        print(f"{display:38} {related_score:>9.3f} {unrelated_score:>9.3f} {related_score - unrelated_score:>7.3f}")
+
+    mean_related = sum(related_scores) / len(related_scores)
+    mean_unrelated = sum(unrelated_scores) / len(unrelated_scores)
+    gap = mean_related - mean_unrelated
+    print("-" * 70)
+    print(f"{'평균':38} {mean_related:>9.3f} {mean_unrelated:>9.3f} {gap:>7.3f}")
+
+    recommended = round(((mean_related + mean_unrelated) / 2) * 20) / 20  # 0.05 단위
+    recommended = max(0.05, min(0.9, recommended))
+    print(f"\n현재 적용 threshold : {service.retriever.effective_threshold:.2f}")
+    print(f"이 모델 권장값      : {recommended:.2f}")
+    if gap < 0.08:
+        print("\n[경고] 관련 문장과 무관한 문장의 점수 차이가 너무 작습니다.")
+        print("       Embedding 모델 설정을 확인하세요(권장: Ollama bge-m3).")
+        return 1
+    print("\n권장값을 쓰려면 Settings에서 threshold를 직접 입력하거나,")
+    print("0(자동)으로 두면 모델별 기본값이 적용됩니다.")
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
     """질문 목록으로 검색 품질을 일괄 점검한다(Phase 10)."""
     path = Path(args.file)
@@ -253,6 +334,10 @@ def build_parser() -> argparse.ArgumentParser:
     restore_parser.set_defaults(func=cmd_restore)
 
     sub.add_parser("selfcheck", help="외부 통신 코드 점검").set_defaults(func=cmd_selfcheck)
+
+    sub.add_parser(
+        "embed-check", help="Embedding 모델 분별력 점검 및 threshold 권장값 확인"
+    ).set_defaults(func=cmd_embed_check)
 
     eval_parser = sub.add_parser("eval", help="질문 목록으로 검색 품질 점검")
     eval_parser.add_argument("--file", default="sample_docs/eval_questions.json")

@@ -44,15 +44,15 @@ class Settings:
     llm_timeout_sec: int = 180
 
     # --- Embedding (로컬 실행) ---
-    # auto -> sentence-transformers, 없으면 ollama, 그것도 없으면 hashing(품질 낮음)
+    # auto -> Ollama(bge-m3) 우선, 없으면 sentence-transformers, 그것도 없으면 hashing
     embed_backend: str = "auto"
-    embed_model: str = "intfloat/multilingual-e5-small"
-    ollama_embed_model: str = "bge-m3"
+    ollama_embed_model: str = "bge-m3"                    # 권장(Ollama에서 실행)
+    embed_model: str = "intfloat/multilingual-e5-small"   # sentence-transformers 사용 시
 
     # --- 검색 ---
     top_k: int = 5
     candidate_k: int = 20
-    score_threshold: float = 0.35
+    score_threshold: float = 0.0        # 0이면 Embedding 모델별 권장값을 자동 사용
     keyword_weight: float = 0.4
     min_keyword_coverage: float = 0.3   # 질문 단어가 문서에서 확인된 비율의 최소값
     min_score_ratio: float = 0.3        # 1위 대비 이 비율 미만인 결과는 출처에서 제외

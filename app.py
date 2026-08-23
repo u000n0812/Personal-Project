@@ -258,14 +258,28 @@ def page_settings(service: AppService) -> None:
         embed_backend = st.selectbox(
             "Embedding backend", backends, index=backends.index(settings.embed_backend)
         )
-        embed_model = st.text_input("Embedding 모델 (sentence-transformers)", value=settings.embed_model)
-        ollama_embed_model = st.text_input("Embedding 모델 (Ollama)", value=settings.ollama_embed_model)
+        ollama_embed_model = st.text_input(
+            "Embedding 모델 (Ollama, 권장)", value=settings.ollama_embed_model,
+            help="예: bge-m3. `ollama pull bge-m3` 로 설치한다.",
+        )
+        embed_model = st.text_input(
+            "Embedding 모델 (sentence-transformers)", value=settings.embed_model,
+            help="Ollama 대신 sentence-transformers를 쓸 때만 사용한다.",
+        )
 
         st.markdown("**검색 / 답변**")
         top_k = st.slider("검색 문서 수 (Top-K)", 1, 15, settings.top_k)
         score_threshold = st.slider(
-            "검색 threshold (vector 유사도)", 0.0, 0.95, float(settings.score_threshold), 0.05,
-            help="이 값 이상이면 근거로 인정한다. 값이 높을수록 답변을 더 자주 거부한다.",
+            "검색 threshold (0 = 모델별 자동)", 0.0, 0.95, float(settings.score_threshold), 0.05,
+            help=(
+                "이 값 이상이면 근거로 인정한다. 값이 높을수록 답변을 더 자주 거부한다. "
+                "0으로 두면 Embedding 모델에 맞는 권장값이 자동 적용된다 "
+                "(bge-m3 0.50 / e5 0.80 / hashing 0.30)."
+            ),
+        )
+        st.caption(
+            f"현재 적용 중인 threshold: {service.retriever.effective_threshold:.2f} "
+            f"(Embedding: {service.embedder.name})"
         )
         min_coverage = st.slider(
             "질문 단어 일치 최소 비율", 0.0, 1.0, float(settings.min_keyword_coverage), 0.05,
@@ -355,7 +369,14 @@ def main() -> None:
             st.caption("터미널에서 `ollama serve` 실행 후 새로고침하세요.")
         stats = service.db.stats()
         st.markdown(f"문서 {stats['active_documents']}건 / Chunk {stats['chunks']}개")
-        st.caption(f"Embedding: {service.settings.embed_backend}")
+        st.caption(f"Embedding: {service.embedder.name}")
+        if service.ingestor.embedding_model_changed():
+            st.error(
+                "Vector Index는 "
+                f"`{service.store.embedder_name}` 로 만들어졌는데 지금은 "
+                f"`{service.embedder.name}` 가 사용 중입니다.\n\n"
+                "Ollama 실행 여부를 확인하거나, Settings에서 **전체 재색인**을 실행하세요."
+            )
 
         if menu == "Chat" and st.button("대화 초기화"):
             st.session_state.history = []

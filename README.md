@@ -30,8 +30,8 @@ pip install -r requirements.txt
 Windows에서는 `run.bat`을 더블클릭하면 위 과정과 실행이 한 번에 진행됩니다.
 (macOS / Linux는 `./run.sh`)
 
-> **가벼운 설치를 원하면**: `requirements.txt` 대신 `requirements-min.txt`를 설치하고,
-> Embedding을 Ollama(`bge-m3`)로 사용하세요. sentence-transformers/torch(수 GB)를 받지 않아도 됩니다.
+> 기본 구성은 **Embedding과 LLM을 모두 Ollama에서 실행**하므로 torch(수 GB)를 설치하지 않습니다.
+> sentence-transformers를 쓰고 싶다면 `pip install -r requirements-sentence-transformers.txt` 로 설치하세요.
 
 ---
 
@@ -48,8 +48,33 @@ Windows에서는 `run.bat`을 더블클릭하면 위 과정과 실행이 한 번
 
 ## 3. 모델 준비 (최초 1회만 인터넷 필요)
 
+### Embedding 모델 — bge-m3 (권장, 기본값)
+
+```bat
+ollama pull bge-m3
+```
+
+`bge-m3`는 한국어·영문이 섞인 지침문서 검색에 적합한 multilingual 모델(1024차원)입니다.
+설치해 두면 프로그램이 자동으로 이 모델을 사용합니다(`Settings → Embedding backend: auto`).
+Ollama를 통해 **로컬에서만** 실행되며 문서 내용이 외부로 전송되지 않습니다.
+
+설치 후 아래 명령으로 모델이 제대로 동작하는지 확인할 수 있습니다.
+
+```bat
+python cli.py embed-check
+```
+
+관련 있는 문장과 무관한 문장의 유사도 차이를 보여주고, 이 모델에 맞는 threshold 권장값을 알려줍니다.
+(정상이라면 관련 문장 0.6~0.8, 무관한 문장 0.3~0.45 수준으로 벌어집니다.)
+
+> sentence-transformers를 쓰려면 `requirements-sentence-transformers.txt`를 설치한 뒤
+> **Settings → Embedding backend**를 `sentence-transformers`로 바꾸고,
+> 모델(`intfloat/multilingual-e5-small`)을 1회 내려받으세요.
+> Embedding 모델을 바꾸면 **Settings → 전체 재색인**을 반드시 실행해야 합니다
+> (모델마다 vector 차원과 값이 달라 기존 Index를 그대로 쓸 수 없습니다).
+
 ### LLM 모델
-일반 업무용 PC 기준 권장 모델(한국어 처리 가능):
+답변 생성에 사용할 모델을 하나 선택합니다(한국어 처리 가능, 업무용 PC 기준).
 
 | 모델 | 명령 | 메모리 기준 |
 |------|------|-------------|
@@ -59,26 +84,11 @@ Windows에서는 `run.bat`을 더블클릭하면 위 과정과 실행이 한 번
 
 지침문서 검색이 목적이므로 지나치게 큰 모델은 사용하지 않습니다.
 
-### Embedding 모델 (둘 중 하나)
-- **A. sentence-transformers (기본값)** — 최초 실행 시 `intfloat/multilingual-e5-small`을 내려받습니다.
-  ```bat
-  set SOPBOT_ALLOW_MODEL_DOWNLOAD=1
-  python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small')"
-  ```
-  한 번 받아두면 이후에는 오프라인에서 동작합니다.
-- **B. Ollama Embedding (설치가 가벼움)**
-  ```bat
-  ollama pull bge-m3
-  ```
-  이후 **Settings → Embedding backend**를 `ollama`로 변경합니다.
-
-> 두 방법 모두 **로컬에서만** 실행되며 문서 내용이 외부로 전송되지 않습니다.
-> 모델을 바꾸면 **Settings → 전체 재색인**을 한 번 실행해야 합니다.
-
-준비 상태는 아래 명령으로 확인할 수 있습니다.
+준비 상태는 아래 명령으로 한 번에 확인합니다.
 ```bat
 python cli.py doctor
 ```
+`Embedding backend : ollama:bge-m3 (dim=1024)` 로 표시되면 정상입니다.
 
 ---
 
@@ -206,6 +216,7 @@ python cli.py remove 3        :: ID 3번 문서 삭제
 ```bat
 python cli.py selfcheck     :: 소스코드에 외부 API·외부 URL·telemetry가 없는지 검사
 python cli.py doctor        :: 실행 환경 + 보안 점검 요약
+python cli.py embed-check   :: Embedding 모델(bge-m3) 분별력 확인
 python -m unittest discover -s tests -t .    :: 전체 자동 테스트
 ```
 
@@ -224,14 +235,14 @@ Personal-Project/
 ├─ app.py               Streamlit UI (Chat / Documents / Settings)
 ├─ cli.py               명령줄 도구 (등록·검색·질문·백업·점검)
 ├─ run.bat / run.sh     실행 스크립트
-├─ requirements.txt     설치 목록
+├─ requirements.txt     설치 목록 (bge-m3 기준, torch 불필요)
 ├─ sopbot/
 │  ├─ security.py       외부 통신 차단, 소스 점검
 │  ├─ config.py         설정값, 경로, 동의어 사전
 │  ├─ db.py             SQLite Metadata (documents / chunks)
 │  ├─ extract.py        PDF·DOCX·TXT·XLSX·PPTX 텍스트 추출
 │  ├─ chunk.py          제목/Section 구조 기반 Chunk 분할
-│  ├─ embed.py          로컬 Embedding (sentence-transformers / Ollama / fallback)
+│  ├─ embed.py          로컬 Embedding (Ollama bge-m3 / sentence-transformers / fallback)
 │  ├─ vectorstore.py    로컬 Vector Index (numpy·faiss, 파일 저장)
 │  ├─ keyword.py        BM25 Keyword 검색 + 동의어 확장
 │  ├─ search.py         Hybrid 검색 + 근거 충분성 판단
@@ -241,7 +252,7 @@ Personal-Project/
 │  ├─ backup.py         zip 백업·복원
 │  └─ service.py        구성 요소 조립 + 상태 점검
 ├─ sample_docs/         테스트용 예시 SOP + 평가 질문 22개
-├─ tests/               자동 테스트 (47개)
+├─ tests/               자동 테스트 (58개)
 └─ data/                실행 시 자동 생성 (문서·Index·DB·로그)
 ```
 
@@ -252,15 +263,17 @@ Personal-Project/
 | 항목 | 설명 | 기본값 |
 |------|------|--------|
 | LLM 모델 | Ollama에 설치된 모델 | `qwen2.5:7b-instruct` |
-| Embedding backend | `auto` / `sentence-transformers` / `ollama` / `hashing` | `auto` |
+| Embedding backend | `auto` / `ollama` / `sentence-transformers` / `hashing` | `auto` (→ Ollama `bge-m3`) |
 | 검색 문서 수 (Top-K) | 답변에 사용할 검색 결과 수 | 5 |
-| 검색 threshold | Vector 유사도 최소값. 높을수록 답변을 더 자주 거부 | 0.35 |
+| 검색 threshold | Vector 유사도 최소값. 높을수록 답변을 더 자주 거부 | 0 (자동: bge-m3 0.50 / e5 0.80) |
 | 질문 단어 일치 최소 비율 | 질문 단어가 문서에서 확인된 비율(모델 무관 보조 기준) | 0.3 |
 | 답변 길이 | 짧게 / 보통 / 자세히 | 보통 |
 
-> threshold 조정 기준: 답변을 너무 자주 거부하면 값을 낮추고,
-> 관련 없는 문서로 답하면 값을 높입니다.
-> `hashing` fallback은 모델이 없을 때만 쓰이는 임시 backend이며 검색 품질이 낮습니다.
+> threshold를 **0으로 두면 Embedding 모델에 맞는 권장값이 자동 적용**됩니다.
+> 직접 조정할 때는 답변을 너무 자주 거부하면 값을 낮추고, 관련 없는 문서로 답하면 높입니다.
+> `python cli.py embed-check` 가 현재 모델에 맞는 값을 알려줍니다.
+> `hashing` fallback은 모델을 찾지 못했을 때만 쓰이는 임시 backend이며 검색 품질이 낮습니다.
+> 사이드바에 이 backend가 표시되면 Ollama 실행 상태와 `ollama pull bge-m3` 설치를 확인하세요.
 
 ---
 
@@ -274,6 +287,8 @@ Personal-Project/
 | 답변이 느림 | 더 작은 LLM 모델 사용(`qwen2.5:3b-instruct`), Top-K를 3으로 낮춤 |
 | 스캔 PDF 등록 실패 | 초기 버전은 OCR 미지원. 텍스트 PDF로 변환 후 등록 |
 | Embedding 모델 변경 후 검색 이상 | Settings → **전체 재색인** 실행 |
+| 사이드바에 "Index는 …로 만들어졌는데" 경고 | Ollama 실행 확인 후 `python cli.py rebuild` |
+| Embedding backend가 `hashing`으로 표시됨 | `ollama serve` 실행 여부, `ollama pull bge-m3` 설치 확인 |
 
 ---
 

@@ -1,0 +1,4 @@
+# Ollama Embedding(bge-m3) 대신 sentence-transformers를 사용할 때만 설치한다.
+# torch를 함께 내려받으므로 용량이 크다(수 GB).
+-r requirements.txt
+sentence-transformers>=2.6
