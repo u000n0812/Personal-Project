@@ -59,6 +59,8 @@ class Settings:
     include_superseded: bool = False
 
     # --- 답변 ---
+    strict_mode: bool = True            # 지침문서 내용만 답변(범위 검사 + 근거 검증)
+    min_sentence_support: float = 0.45  # 답변 문장이 문서 내용과 일치해야 하는 최소 비율
     answer_length: str = "보통"  # 짧게 | 보통 | 자세히
     max_context_chars: int = 6000
     history_turns: int = 3

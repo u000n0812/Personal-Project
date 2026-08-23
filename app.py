@@ -26,7 +26,7 @@ from sopbot.config import (  # noqa: E402
 )
 from sopbot.db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED  # noqa: E402
 from sopbot.extract import SUPPORTED_EXTENSIONS  # noqa: E402
-from sopbot.rag import postprocess_answer  # noqa: E402
+from sopbot.rag import postprocess_answer  # noqa: E402  (strict_mode 해제 시 사용)
 from sopbot.service import AppService  # noqa: E402
 
 STATUS_LABEL = {
@@ -132,10 +132,21 @@ def page_chat(service: AppService) -> None:
         for piece in stream:
             collected += piece
             placeholder.markdown(collected)
+        report = None
         if evidence == "ok" and results:
-            # 모델이 임의로 만든 출처 목록을 실제 검색 결과로 교체한다.
-            collected = postprocess_answer(collected, results)
+            # 문서에 근거가 없는 문장을 제거하고, 출처를 실제 검색 결과로 교체한다.
+            collected, report = service.engine.finalize_stream(collected, results)
             placeholder.markdown(collected)
+            if report is None:
+                collected = postprocess_answer(collected, results)
+        if report is not None:
+            if report.unsupported:
+                st.caption(
+                    f"🛡️ 근거 검증: {report.summary} · "
+                    f"문서에서 확인되지 않은 문장 {len(report.unsupported)}개 제외"
+                )
+            else:
+                st.caption(f"🛡️ 근거 검증: {report.summary} 모두 지침문서에서 확인됨")
         render_sources(results, key_prefix=f"live{len(st.session_state.history)}")
 
     st.session_state.history.append((question, collected, results))
@@ -290,6 +301,22 @@ def page_settings(service: AppService) -> None:
             index=["짧게", "보통", "자세히"].index(settings.answer_length),
             horizontal=True,
         )
+
+        st.markdown("**지침문서 전용 모드**")
+        strict_mode = st.checkbox(
+            "등록된 지침문서 내용만 답변 (권장)", value=settings.strict_mode,
+            help=(
+                "켜면 ① 지침 조회가 아닌 요청(코드 작성·번역·일반 상담)과 규칙 무시 시도를 "
+                "LLM 호출 전에 거부하고, ② 생성된 답변에서 문서에 근거가 없는 문장을 제거한다."
+            ),
+        )
+        min_sentence_support = st.slider(
+            "답변 문장의 문서 일치 최소 비율", 0.0, 0.9, float(settings.min_sentence_support), 0.05,
+            help=(
+                "답변 문장의 단어가 검색된 문서에서 확인되는 비율. 높일수록 엄격해진다. "
+                "문서에 없는 숫자(기간·횟수)가 나오면 비율과 무관하게 제외한다."
+            ),
+        )
         include_superseded = st.checkbox(
             "과거 버전 문서도 검색에 포함", value=settings.include_superseded
         )
@@ -311,6 +338,8 @@ def page_settings(service: AppService) -> None:
             keyword_weight=settings.keyword_weight,
             min_keyword_coverage=min_coverage,
             min_score_ratio=settings.min_score_ratio,
+            strict_mode=strict_mode,
+            min_sentence_support=min_sentence_support,
             include_superseded=include_superseded,
             answer_length=answer_length,
             max_context_chars=settings.max_context_chars,
@@ -370,6 +399,10 @@ def main() -> None:
         stats = service.db.stats()
         st.markdown(f"문서 {stats['active_documents']}건 / Chunk {stats['chunks']}개")
         st.caption(f"Embedding: {service.embedder.name}")
+        if service.settings.strict_mode:
+            st.caption("🛡️ 지침문서 전용 모드 ON")
+        else:
+            st.warning("지침문서 전용 모드가 꺼져 있습니다(문서 밖 내용이 나올 수 있음).")
         if service.ingestor.embedding_model_changed():
             st.error(
                 "Vector Index는 "

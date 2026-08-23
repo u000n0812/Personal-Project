@@ -142,7 +142,12 @@ def cmd_ask(args: argparse.Namespace) -> int:
     service = _service()
     answer = service.ask(args.question)
     print(answer.answer)
-    print(f"\n(검색 {len(answer.results)}건, LLM 사용 {'예' if answer.used_llm else '아니오'}, {answer.elapsed_sec}s)")
+    detail = f"검색 {len(answer.results)}건, LLM 사용 {'예' if answer.used_llm else '아니오'}"
+    if answer.grounding is not None:
+        detail += f", {answer.grounding.summary}"
+        if answer.grounding.unsupported:
+            detail += f"(문서 밖 문장 {len(answer.grounding.unsupported)}개 제외)"
+    print(f"\n({detail}, {answer.elapsed_sec}s)")
     return 0
 
 
