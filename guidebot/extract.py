@@ -95,14 +95,49 @@ def extract_txt(path: Path) -> ExtractedDocument:
     return ExtractedDocument(blocks=blocks, page_count=1)
 
 
+def pdf_crypto_backend() -> tuple[str, str] | None:
+    """pypdf가 실제로 사용 중인 암호화 백엔드를 반환한다: (이름, 버전).
+
+    pypdf는 어떤 백엔드(cryptography > pycryptodome > fallback)를 쓸지
+    프로세스가 처음 pypdf를 import할 때 딱 한 번만 정하고 그 결과를 캐시한다.
+    그래서 서버 실행 도중 pip install을 해도, 프로세스를 완전히 재시작하기 전까지는
+    반영되지 않는다. 이 함수는 지금 이 프로세스가 실제로 쓰고 있는 백엔드를 그대로
+    보여줘서, "설치는 했는데 왜 안 되지?"를 구분할 수 있게 한다.
+    """
+    try:
+        from pypdf._crypt_providers import crypt_provider
+    except Exception:
+        return None
+    return crypt_provider
+
+
+def pdf_crypto_backend_is_usable() -> bool:
+    """AES로 암호화된 PDF를 읽을 수 있는 백엔드가 로드되어 있는지 확인한다."""
+    backend = pdf_crypto_backend()
+    return bool(backend) and backend[0] != "local_crypt_fallback"
+
+
 def _pdf_read_error_message(exc: Exception) -> str:
     """pypdf 예외를 사용자가 조치할 수 있는 메시지로 바꾼다."""
     text = f"{exc.__class__.__name__}: {exc}".lower()
     if "cryptography" in text or "dependencyerror" in exc.__class__.__name__.lower():
+        backend = pdf_crypto_backend()
+        if backend and backend[0] != "local_crypt_fallback":
+            # cryptography는 로드되어 있는데도 실패한 경우: 설치 문제가 아니다.
+            return (
+                f"이 PDF의 암호화 방식을 처리하지 못했습니다({exc.__class__.__name__}: {exc}). "
+                "파일이 손상되었거나 지원하지 않는 암호화 방식일 수 있습니다."
+            )
         return (
             "이 PDF는 암호화(AES)되어 있는데, 이를 해독할 라이브러리(cryptography)가 "
-            "설치되어 있지 않습니다. 터미널에서 다음을 실행한 뒤 다시 시도하세요:\n"
-            "  pip install cryptography"
+            "이 프로그램에서 아직 로드되지 않았습니다.\n\n"
+            "1) 터미널에서 실행하세요:  pip install cryptography\n"
+            "2) 이미 설치했다면 지금 실행 중인 GuideBot을 완전히 종료(터미널 창 닫기 또는 "
+            "Ctrl+C)한 뒤 run.bat으로 다시 실행하세요.\n"
+            "   (Streamlit 새로고침만으로는 반영되지 않습니다 - 파이썬 프로세스가 켜져 있는 "
+            "동안 설치한 라이브러리는 그 프로세스에 자동으로 반영되지 않습니다.)\n\n"
+            "설정 화면(Settings)에서 '문서 처리' 상태를 보면 지금 이 프로그램이 "
+            "cryptography를 실제로 쓰고 있는지 확인할 수 있습니다."
         )
     return f"PDF를 읽는 중 오류가 발생했습니다({exc.__class__.__name__}). 파일이 손상되었는지 확인하세요."
 

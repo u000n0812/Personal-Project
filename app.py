@@ -27,7 +27,7 @@ from guidebot.config import (  # noqa: E402
     ensure_dirs,
 )
 from guidebot.db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED  # noqa: E402
-from guidebot.extract import SUPPORTED_EXTENSIONS  # noqa: E402
+from guidebot.extract import SUPPORTED_EXTENSIONS, pdf_crypto_backend_is_usable  # noqa: E402
 from guidebot.rag import postprocess_answer  # noqa: E402  (strict_mode 해제 시 사용)
 from guidebot.service import AppService  # noqa: E402
 
@@ -481,6 +481,13 @@ def main() -> None:
         stats = service.db.stats()
         st.markdown(f"문서 {stats['active_documents']}건 / Chunk {stats['chunks']}개")
         st.caption(f"Embedding: {service.embedder.name}")
+        if not pdf_crypto_backend_is_usable():
+            st.warning(
+                "암호화된 PDF를 열 라이브러리(cryptography)가 로드되어 있지 않습니다.\n\n"
+                "1) 터미널에서 `pip install cryptography` 실행\n"
+                "2) **이 창을 닫고 GuideBot을 완전히 재시작**하세요 "
+                "(새로고침만으로는 반영되지 않습니다)"
+            )
         if service.settings.strict_mode:
             st.caption("🛡️ 지침문서 전용 모드 ON")
         else:

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from .config import CONFIG_PATH, DATA_DIR, INDEX_DIR, Settings, ensure_dirs
 from .db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED, Database
 from .embed import BaseEmbedder, get_embedder
+from .extract import pdf_crypto_backend
 from .ingest import DocumentIngestor, IngestResult
 from .llm import OllamaClient
 from .logging_setup import get_logger
@@ -41,6 +42,7 @@ class HealthReport:
     documents: int
     active_documents: int
     chunks: int
+    pdf_crypto_backend: str
 
     def as_lines(self) -> list[str]:
         return [
@@ -55,6 +57,7 @@ class HealthReport:
             f"모델 변경 감지     : {'예 → 전체 재색인 필요' if self.embedding_model_changed else '아니오'}",
             f"등록 문서          : {self.documents}개 (활성 {self.active_documents}개)",
             f"Chunk 수           : {self.chunks}개",
+            f"PDF 암호화 처리    : {self.pdf_crypto_backend}",
         ]
 
 
@@ -166,6 +169,16 @@ class AppService:
         except Exception as exc:  # 모델 준비 전에도 진단은 가능해야 한다.
             embedder_name, dimension = f"사용 불가 ({exc.__class__.__name__})", 0
         stats = self.db.stats()
+        crypto = pdf_crypto_backend()
+        if crypto is None:
+            pdf_crypto_label = "확인 불가 (pypdf 미설치)"
+        elif crypto[0] == "local_crypt_fallback":
+            pdf_crypto_label = (
+                "cryptography 없음 - 암호화된 PDF를 열 수 없습니다 "
+                "(pip install cryptography 후 프로그램을 완전히 재시작하세요)"
+            )
+        else:
+            pdf_crypto_label = f"{crypto[0]} {crypto[1]} (정상)"
         return HealthReport(
             data_dir=str(DATA_DIR),
             llm_host=self.settings.ollama_host,
@@ -181,6 +194,7 @@ class AppService:
             documents=stats["documents"],
             active_documents=stats["active_documents"],
             chunks=stats["chunks"],
+            pdf_crypto_backend=pdf_crypto_label,
         )
 
     def documents(self, include_all: bool = True):

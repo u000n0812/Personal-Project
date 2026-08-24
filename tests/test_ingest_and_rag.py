@@ -430,3 +430,47 @@ class LegacyDataTest(unittest.TestCase):
             finally:
                 config.DB_PATH, config.LEGACY_DB_PATH = original_db, original_legacy
                 db_module.DB_PATH, db_module.LEGACY_DB_PATH = original_db, original_legacy
+
+
+class HealthReportPdfCryptoTest(unittest.TestCase):
+    """health()가 pypdf의 실제 암호화 백엔드 상태를 정확히 보고하는지 검증한다.
+
+    사용자가 cryptography를 설치했다고 주장했는데도 경고가 계속 나온 사례가 있었다.
+    원인은 pypdf가 프로세스당 한 번만 백엔드를 결정해 캐시하기 때문이었다.
+    health()는 지금 이 프로세스가 실제로 쓰는 백엔드를 그대로 보여줘야 한다.
+    """
+
+    def _service(self):
+        import guidebot.service as service_module
+
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        import os
+
+        os.environ["GUIDEBOT_DATA_DIR"] = temp.name
+        return service_module.AppService(Settings())
+
+    def test_reports_working_backend(self):
+        from unittest.mock import patch
+
+        service = self._service()
+        with patch(
+            "guidebot.service.pdf_crypto_backend",
+            return_value=("cryptography", "41.0.7"),
+        ):
+            report = service.health()
+        self.assertIn("cryptography 41.0.7", report.pdf_crypto_backend)
+        self.assertIn("정상", report.pdf_crypto_backend)
+
+    def test_reports_missing_backend_with_restart_hint(self):
+        """설치했다고 착각하기 쉬운 상황 - fallback이면 재시작을 안내해야 한다."""
+        from unittest.mock import patch
+
+        service = self._service()
+        with patch(
+            "guidebot.service.pdf_crypto_backend",
+            return_value=("local_crypt_fallback", "0.0.0"),
+        ):
+            report = service.health()
+        self.assertIn("cryptography 없음", report.pdf_crypto_backend)
+        self.assertIn("재시작", report.pdf_crypto_backend)

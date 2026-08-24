@@ -6,7 +6,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from guidebot.extract import ExtractionError, _pdf_read_error_message, extract_document
+from guidebot.extract import (
+    ExtractionError,
+    _pdf_read_error_message,
+    extract_document,
+    pdf_crypto_backend_is_usable,
+)
 
 try:
     import pypdf
@@ -85,11 +90,12 @@ class PdfExtractionTest(unittest.TestCase):
         self.assertIn("텍스트가 적게", document.warning)
 
     def test_missing_cryptography_dependency_gives_actionable_message(self):
-        """cryptography 미설치로 AES 복호화가 실패하는 상황을 흉내낸다.
+        """cryptography가 실제로 로드되지 않은 상태(fallback 백엔드)를 흉내낸다.
 
         실제로는 pypdf.errors.DependencyError가 나지만, 이 환경에는
         cryptography가 설치돼 있으므로 reader.pages 접근 자체를 모킹해
-        같은 상황(페이지 접근 시 예외)을 재현한다.
+        같은 상황(페이지 접근 시 예외)을 재현한다. pdf_crypto_backend()도
+        fallback을 반환하도록 함께 모킹해 '설치 안 됨' 상태를 재현한다.
         """
 
         class FakeDependencyError(Exception):
@@ -102,13 +108,43 @@ class PdfExtractionTest(unittest.TestCase):
         mock_reader = MagicMock(is_encrypted=False, pages=mock_pages)
 
         path = write_pdf(self.dir, "aes.pdf", PLAIN_PDF_B64)   # 내용은 모킹되므로 무관
-        with patch("pypdf.PdfReader", return_value=mock_reader):
+        with patch("pypdf.PdfReader", return_value=mock_reader), patch(
+            "guidebot.extract.pdf_crypto_backend",
+            return_value=("local_crypt_fallback", "0.0.0"),
+        ):
             with self.assertRaises(ExtractionError) as caught:
                 extract_document(path)
 
         message = str(caught.exception)
         self.assertIn("cryptography", message)
         self.assertIn("pip install cryptography", message)
+        self.assertIn("완전히 종료", message)   # 이미 설치한 경우의 진짜 원인도 안내
+
+    def test_dependency_error_with_cryptography_already_loaded(self):
+        """cryptography가 실제로 로드되어 있는데도 같은 예외가 나는 경우는
+
+        (사용자가 '분명히 설치했는데 왜 또 나오냐'고 묻는 상황) 설치 안내를
+        반복하지 않고 다른 원인(손상된 파일 등)임을 알려야 한다.
+        """
+
+        class FakeDependencyError(Exception):
+            pass
+
+        mock_pages = MagicMock()
+        mock_pages.__len__.side_effect = FakeDependencyError("unexpected AES failure")
+        mock_reader = MagicMock(is_encrypted=False, pages=mock_pages)
+
+        path = write_pdf(self.dir, "aes2.pdf", PLAIN_PDF_B64)
+        with patch("pypdf.PdfReader", return_value=mock_reader), patch(
+            "guidebot.extract.pdf_crypto_backend",
+            return_value=("cryptography", "41.0.7"),
+        ):
+            with self.assertRaises(ExtractionError) as caught:
+                extract_document(path)
+
+        message = str(caught.exception)
+        self.assertNotIn("pip install cryptography", message)   # 이미 로드돼 있으므로 재설치 안내는 오해를 줌
+        self.assertIn("손상", message)
 
     def test_pdf_read_error_message_detects_dependency_error_by_class_name(self):
         """메시지에 'cryptography'가 없어도 예외 클래스명이 DependencyError면 안내한다."""
@@ -116,13 +152,21 @@ class PdfExtractionTest(unittest.TestCase):
         class DependencyError(Exception):
             pass
 
-        message = _pdf_read_error_message(DependencyError("some backend missing"))
+        with patch(
+            "guidebot.extract.pdf_crypto_backend",
+            return_value=("local_crypt_fallback", "0.0.0"),
+        ):
+            message = _pdf_read_error_message(DependencyError("some backend missing"))
         self.assertIn("pip install cryptography", message)
 
     def test_other_pdf_errors_get_generic_message(self):
         message = _pdf_read_error_message(ValueError("unexpected EOF"))
         self.assertNotIn("cryptography", message)
         self.assertIn("PDF를 읽는 중 오류", message)
+
+    def test_pdf_crypto_backend_usable_in_this_environment(self):
+        """이 테스트 환경에는 cryptography가 실제로 설치되어 있어야 한다."""
+        self.assertTrue(pdf_crypto_backend_is_usable())
 
 
 if __name__ == "__main__":
