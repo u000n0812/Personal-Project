@@ -5,6 +5,7 @@ CLI(cli.py)와 Streamlit UI(app.py)가 동일한 객체 구성을 사용하도�
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -43,9 +44,11 @@ class HealthReport:
     active_documents: int
     chunks: int
     pdf_crypto_backend: str
+    python_executable: str
 
     def as_lines(self) -> list[str]:
         return [
+            f"Python 실행 파일   : {self.python_executable}",
             f"데이터 폴더        : {self.data_dir}",
             f"로컬 LLM 주소      : {self.llm_host}",
             f"로컬 LLM 연결      : {'연결됨' if self.llm_available else '연결 안 됨 (ollama serve 확인)'}",
@@ -195,6 +198,7 @@ class AppService:
             active_documents=stats["active_documents"],
             chunks=stats["chunks"],
             pdf_crypto_backend=pdf_crypto_label,
+            python_executable=sys.executable,
         )
 
     def documents(self, include_all: bool = True):

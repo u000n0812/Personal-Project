@@ -28,6 +28,7 @@ from guidebot.config import (  # noqa: E402
 )
 from guidebot.db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED  # noqa: E402
 from guidebot.extract import SUPPORTED_EXTENSIONS, pdf_crypto_backend_is_usable  # noqa: E402
+from guidebot.llm import looks_like_embedding_model  # noqa: E402
 from guidebot.rag import postprocess_answer  # noqa: E402  (strict_mode 해제 시 사용)
 from guidebot.service import AppService  # noqa: E402
 
@@ -188,7 +189,7 @@ def page_chat(service: AppService) -> None:
         if state.error and results:
             collected, report = service.engine.finalize_stream(collected, results, state)
             placeholder.markdown(collected)
-            st.error("로컬 LLM 호출에 실패했습니다. 사이드바의 LLM 상태를 확인하세요.")
+            st.caption(f"⚠️ 답변 생성 실패 상세: {state.error}")
         elif evidence == "ok" and results:
             # 문서에 근거가 없는 문장을 제거하고, 출처를 실제 검색 결과로 교체한다.
             collected, report = service.engine.finalize_stream(collected, results, state)
@@ -316,6 +317,14 @@ def page_settings(service: AppService) -> None:
         if installed:
             options = installed if settings.llm_model in installed else [settings.llm_model] + installed
             llm_model = st.selectbox("LLM 모델", options, index=options.index(settings.llm_model))
+            embedding_looking = [m for m in options if looks_like_embedding_model(m)]
+            if embedding_looking:
+                st.caption(
+                    "⚠️ 목록의 "
+                    + ", ".join(f"`{m}`" for m in embedding_looking)
+                    + "는 임베딩 전용 모델로 보입니다 - 여기(LLM 모델)가 아니라 "
+                    "**아래 Embedding 모델(Ollama)** 칸에 넣어야 합니다."
+                )
         else:
             llm_model = st.text_input("LLM 모델", value=settings.llm_model)
             st.caption("Ollama에 연결되지 않아 모델 목록을 불러오지 못했습니다.")
@@ -478,15 +487,28 @@ def main() -> None:
                     f"터미널에서 설치하세요:\n\n`ollama pull {selected}`\n\n"
                     "설치된 모델: " + (", ".join(installed) if installed else "없음")
                 )
+            elif looks_like_embedding_model(selected):
+                # 모델은 설치돼 있어 "연결됨"으로 보이지만, 임베딩 전용이라
+                # 답변을 생성하지 못한다. 위 초록색 상태만 보고는 알 수 없는
+                # 실패 원인이라 여기서 따로 짚어준다.
+                st.error(
+                    f"LLM 모델로 선택된 `{selected}`은 임베딩(검색) 전용 모델입니다. "
+                    "설치는 되어 있어 위에는 '연결됨'으로 표시되지만, 이 모델로는 "
+                    "답변 문장을 만들 수 없습니다.\n\n"
+                    "**Settings → LLM 모델**을 대화형 모델로 바꾸세요. 예:\n\n"
+                    f"`ollama pull qwen2.5:7b-instruct`\n\n"
+                    f"`{selected}`은 Embedding 모델 설정에는 그대로 두시면 됩니다."
+                )
         stats = service.db.stats()
         st.markdown(f"문서 {stats['active_documents']}건 / Chunk {stats['chunks']}개")
         st.caption(f"Embedding: {service.embedder.name}")
         if not pdf_crypto_backend_is_usable():
             st.warning(
                 "암호화된 PDF를 열 라이브러리(cryptography)가 로드되어 있지 않습니다.\n\n"
-                "1) 터미널에서 `pip install cryptography` 실행\n"
-                "2) **이 창을 닫고 GuideBot을 완전히 재시작**하세요 "
-                "(새로고침만으로는 반영되지 않습니다)"
+                "**이 창을 닫고 run.bat을 다시 실행**하세요 - 실행할 때마다 필요한 "
+                "라이브러리를 자동으로 맞춰 설치합니다(새로고침만으로는 반영되지 않습니다).\n\n"
+                "터미널에 직접 `pip install`을 입력하지 마세요 - 파이썬이 여러 개 "
+                "설치되어 있으면 엉뚱한 곳에 설치될 수 있습니다."
             )
         if service.settings.strict_mode:
             st.caption("🛡️ 지침문서 전용 모드 ON")

@@ -131,13 +131,14 @@ def _pdf_read_error_message(exc: Exception) -> str:
         return (
             "이 PDF는 암호화(AES)되어 있는데, 이를 해독할 라이브러리(cryptography)가 "
             "이 프로그램에서 아직 로드되지 않았습니다.\n\n"
-            "1) 터미널에서 실행하세요:  pip install cryptography\n"
-            "2) 이미 설치했다면 지금 실행 중인 GuideBot을 완전히 종료(터미널 창 닫기 또는 "
-            "Ctrl+C)한 뒤 run.bat으로 다시 실행하세요.\n"
-            "   (Streamlit 새로고침만으로는 반영되지 않습니다 - 파이썬 프로세스가 켜져 있는 "
-            "동안 설치한 라이브러리는 그 프로세스에 자동으로 반영되지 않습니다.)\n\n"
-            "설정 화면(Settings)에서 '문서 처리' 상태를 보면 지금 이 프로그램이 "
-            "cryptography를 실제로 쓰고 있는지 확인할 수 있습니다."
+            "가장 확실한 방법: 지금 실행 중인 GuideBot을 완전히 종료(터미널 창 닫기 또는 "
+            "Ctrl+C)한 뒤 run.bat을 다시 실행하세요. run.bat은 매번 실행할 때마다 필요한 "
+            "라이브러리를 자동으로 맞춰 설치합니다.\n\n"
+            "터미널에 직접 `pip install cryptography`를 입력하지 마세요 - PC에 파이썬이 "
+            "여러 개 설치되어 있으면 GuideBot이 쓰는 파이썬과 다른 곳에 설치될 수 있습니다 "
+            "(실제로 이 오류가 나는 대부분의 경우입니다).\n\n"
+            "`python cli.py doctor`를 실행하면 'PDF 암호화 처리'와 'Python 실행 파일' "
+            "줄에서 지금 이 프로그램이 정확히 어떤 상태인지 확인할 수 있습니다."
         )
     return f"PDF를 읽는 중 오류가 발생했습니다({exc.__class__.__name__}). 파일이 손상되었는지 확인하세요."
 

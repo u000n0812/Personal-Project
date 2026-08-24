@@ -229,6 +229,25 @@ class IngestRagTest(unittest.TestCase):
         self.assertFalse(answer.used_llm)
         self.assertIn("출처:", answer.answer)
 
+    def test_embedding_model_selected_as_llm_gives_specific_guidance(self):
+        """실제 사례: bge-m3를 Chat용 LLM 모델로 잘못 지정한 경우.
+
+        일반적인 "Ollama 실행 여부를 확인하세요" 안내는 이 경우 틀린 조언이다
+        (모델은 이미 설치되어 정상 동작 중이므로). 원인(모델 종류 착각)과
+        해결책(Settings에서 대화형 모델로 교체)을 정확히 짚어줘야 한다.
+        """
+        self.ingestor.register_file(self._write("SOP_ExternalData_v2.1.txt"))
+        self.retriever.invalidate()
+        self.settings.llm_model = "bge-m3:latest"
+
+        answer = self._engine(FakeClient(fail=True)).answer("Password는 어떻게 전달해?")
+
+        self.assertFalse(answer.used_llm)
+        self.assertIn("임베딩", answer.answer)
+        self.assertIn("qwen2.5:7b-instruct", answer.answer)
+        self.assertNotIn("Ollama 실행 여부와 모델 설치를 확인", answer.answer)
+        self.assertIn("출처:", answer.answer)   # 검색된 문서는 여전히 보여준다
+
     def test_multiple_documents_are_distinguished(self):
         self.ingestor.register_file(self._write("SOP_ExternalData_v2.1.txt"))
         self.ingestor.register_file(self._write("SOP_DatabaseLock_v1.4.txt", LOCK_TEXT))

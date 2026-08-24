@@ -184,5 +184,35 @@ class LlmClientTest(unittest.TestCase):
         self.assertIn("ollama pull 없는모델", str(caught.exception))
 
 
+class EmbeddingModelHeuristicTest(unittest.TestCase):
+    """실제 사례: bge-m3(임베딩 전용)를 LLM 모델로 잘못 선택한 경우를 감지한다.
+
+    사이드바가 '연결됨'으로 표시되고 모델도 실제로 설치되어 있어서, 사용자가
+    "Ollama가 문제"라고 오해하기 쉽다. 이름 패턴으로 이 상황을 미리 감지해
+    정확한 원인(모델 종류 착각)을 알려줘야 한다.
+    """
+
+    def test_known_embedding_models_detected(self):
+        from guidebot.llm import looks_like_embedding_model
+
+        for name in (
+            "bge-m3", "bge-m3:latest", "bge-large",
+            "nomic-embed-text", "mxbai-embed-large",
+            "e5-large", "gte-large", "all-minilm",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(looks_like_embedding_model(name), name)
+
+    def test_chat_models_not_flagged(self):
+        from guidebot.llm import looks_like_embedding_model
+
+        for name in (
+            "qwen2.5:7b-instruct", "llama3.1:8b", "exaone3.5:7.8b",
+            "gemma2:9b", "deepseek-r1:8b", "mistral:7b",
+        ):
+            with self.subTest(name=name):
+                self.assertFalse(looks_like_embedding_model(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()

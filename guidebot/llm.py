@@ -24,6 +24,28 @@ class LLMError(RuntimeError):
     """로컬 LLM 호출 실패."""
 
 
+# Ollama에서 흔히 쓰이는 임베딩 전용 모델의 이름 패턴.
+# 이런 모델은 문장을 벡터로 바꾸는 것만 지원하며 /api/chat으로 대화 답변을
+# 생성할 수 없다(모델 자체에 대화 템플릿이 없다). 이름만으로 판단하는
+# 휴리스틱이라 완벽하지 않지만, Ollama 레지스트리의 주요 임베딩 모델
+# (bge-*, e5-*, gte-*, nomic-embed-*, mxbai-embed-*, all-minilm 등)은
+# 모두 이 패턴에 걸린다.
+_EMBEDDING_MODEL_HINTS = ("embed", "bge", "e5", "gte", "minilm")
+
+
+def looks_like_embedding_model(model_name: str) -> bool:
+    """모델 이름이 임베딩 전용 모델처럼 보이는지 이름으로 추정한다.
+
+    답변 생성(Chat)용으로 임베딩 전용 모델을 선택하면 항상 실패하는데,
+    Ollama가 돌려주는 오류 메시지만으로는 사용자가 원인(모델 종류 착각)을
+    알아채기 어렵다. 이 휴리스틱으로 그 상황을 미리 감지해 안내한다.
+    """
+    base_name = model_name.split(":")[0].strip().lower()
+    if not base_name:
+        return False
+    return any(hint in base_name for hint in _EMBEDDING_MODEL_HINTS)
+
+
 @dataclass
 class ChatMessage:
     role: str   # system | user | assistant

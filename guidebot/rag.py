@@ -18,7 +18,7 @@ from .config import (
     Settings,
 )
 from .guard import OUT_OF_SCOPE_ANSWER, GroundingReport, apply_grounding, check_scope
-from .llm import ChatMessage, LLMError, OllamaClient
+from .llm import ChatMessage, LLMError, OllamaClient, looks_like_embedding_model
 from .logging_setup import get_logger
 from .search import Retriever, SearchResult
 
@@ -62,10 +62,24 @@ def top_excerpt(results: Sequence["SearchResult"], limit: int = 500) -> str:
 
 def llm_failure_message(model: str, results: Sequence["SearchResult"]) -> str:
     """LLM 호출이 실패했을 때, 검색된 지침 내용이라도 보여준다."""
-    lines = [
-        f"로컬 LLM('{model}')에 연결하지 못해 답변 문장을 만들지 못했습니다.",
-        "Ollama 실행 여부와 모델 설치를 확인해 주세요:  ollama pull " + model,
-    ]
+    if looks_like_embedding_model(model):
+        # 가장 흔한 실패 원인: 임베딩 전용 모델(bge-m3 등)을 답변 생성용
+        # LLM 모델로 잘못 선택한 경우. "설치 여부 확인" 안내는 이 경우
+        # 오히려 혼란을 준다(이미 설치되어 있고 정상 동작 중이므로).
+        lines = [
+            f"선택된 LLM 모델 '{model}'은 임베딩(검색) 전용 모델로 보입니다. "
+            "이런 모델은 문장을 검색용 벡터로 바꾸는 것만 할 수 있고, "
+            "답변 문장을 생성하지는 못합니다.",
+            "",
+            "Settings → LLM 모델을 대화형(instruct) 모델로 바꿔주세요. 예:",
+            "  ollama pull qwen2.5:7b-instruct",
+            f"'{model}'은 그대로 Embedding 모델 설정에 두시면 됩니다 - 검색에는 계속 사용됩니다.",
+        ]
+    else:
+        lines = [
+            f"로컬 LLM('{model}')에 연결하지 못해 답변 문장을 만들지 못했습니다.",
+            "Ollama 실행 여부와 모델 설치를 확인해 주세요:  ollama pull " + model,
+        ]
     if results:
         lines.append("")
         lines.append("다만 질문과 관련된 지침문서는 찾았습니다. 원문을 그대로 옮깁니다.")

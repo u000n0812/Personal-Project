@@ -24,17 +24,22 @@ if not exist ".venv" (
         pause
         exit /b 1
     )
-    call ".venv\Scripts\activate.bat"
-    echo [2/3] Installing required libraries ...
-    python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
-    if errorlevel 1 (
-        echo [ERROR] Failed to install libraries. Check your internet connection and try again.
-        pause
-        exit /b 1
-    )
-) else (
-    call ".venv\Scripts\activate.bat"
+)
+
+call ".venv\Scripts\activate.bat"
+
+REM Always (re)install requirements, not just on first setup. This keeps the
+REM .venv in sync whenever requirements.txt gains a new dependency, and
+REM guarantees packages land in the SAME Python this app actually runs with
+REM (a very common mistake is running "pip install X" in a different
+REM terminal/Python than the one .venv uses - this line prevents that).
+echo [2/3] Checking required libraries (this is quick if nothing changed) ...
+python -m pip install --upgrade pip --quiet
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo [ERROR] Failed to install libraries. Check your internet connection and try again.
+    pause
+    exit /b 1
 )
 
 echo [3/3] GuideBot is starting. Open http://127.0.0.1:8501 in your browser.

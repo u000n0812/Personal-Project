@@ -34,6 +34,12 @@ Windows에서는 `run.bat`을 더블클릭하면 위 과정과 실행이 한 번
 > 기본 구성은 **Embedding과 LLM을 모두 Ollama에서 실행**하므로 torch(수 GB)를 설치하지 않습니다.
 > sentence-transformers를 쓰고 싶다면 `pip install -r requirements-sentence-transformers.txt` 로 설치하세요.
 
+> **라이브러리는 터미널에 직접 `pip install`하지 말고 `run.bat`(또는 `run.sh`)로 설치/갱신하세요.**
+> `run.bat`은 실행할 때마다 `requirements.txt`를 다시 설치합니다(이미 설치된 건 순식간에 건너뜁니다).
+> PC에 파이썬이 여러 개 설치되어 있으면, 직접 입력한 `pip install`은 GuideBot이 쓰는
+> `.venv`가 아니라 엉뚱한 파이썬에 설치될 수 있습니다 — `run.bat`으로 설치하면 항상
+> 이 프로그램이 실제로 쓰는 `.venv`에 정확히 들어갑니다.
+
 ---
 
 ## 2. Local LLM 설치 (Ollama)
@@ -76,6 +82,13 @@ python cli.py embed-check
 
 ### LLM 모델
 답변 생성에 사용할 모델을 하나 선택합니다(한국어 처리 가능, 업무용 PC 기준).
+
+> ⚠️ **bge-m3는 검색(Embedding) 전용 모델입니다. 답변을 생성하지 못합니다.**
+> `ollama pull bge-m3`만 받아두고 Settings의 **LLM 모델**에도 같은 값을 넣으면
+> "선택된 LLM 모델은 임베딩 전용 모델입니다"라는 오류로 답변이 만들어지지 않습니다.
+> bge-m3는 **Embedding 모델(Ollama)** 칸에만 넣고, **LLM 모델**에는 아래 표의
+> 모델처럼 별도의 대화형(instruct) 모델을 설치해서 넣어야 합니다. 즉 이 프로그램은
+> 최소 **두 개의 모델**(검색용 + 답변 생성용)이 필요합니다.
 
 | 모델 | 명령 | 메모리 기준 |
 |------|------|-------------|
@@ -319,7 +332,7 @@ Personal-Project/
 │  ├─ backup.py         zip 백업·복원
 │  └─ service.py        구성 요소 조립 + 상태 점검
 ├─ sample_docs/         테스트용 예시 SOP + 평가 질문 22개
-├─ tests/               자동 테스트 (96개)
+├─ tests/               자동 테스트 (99개)
 └─ data/                실행 시 자동 생성 (문서·Index·DB·로그)
 ```
 
@@ -359,9 +372,10 @@ Personal-Project/
 | PDF 등록 실패 | `python cli.py inspect "파일경로"` 로 원인 확인(암호 보호 / 텍스트 없음 / 페이지별 추출량) |
 | 이미지·스캔 PDF 등록 실패 | 원본 파일(DOCX/PPTX)을 등록하거나, OCR 처리한 PDF 사본을 등록 |
 | 암호가 걸린 PDF 등록 실패 | 빈 암호는 자동 처리됩니다. 실제 암호가 걸린 파일은 암호를 해제한 사본을 등록 |
-| PDF 업로드 시 `cryptography>=3.1 is required for AES algorithm` 오류로 화면 전체가 멈춤 | `pip install cryptography` 실행 후 다시 시도(최신 `requirements.txt`로 설치하면 자동 포함됨). 이미 받은 `.venv`가 있다면 `.venv\Scripts\activate` 후 `pip install -r requirements.txt`로 갱신 |
-| `cryptography`를 설치했는데도 같은 경고가 계속 나옴 | **설치 후 GuideBot을 완전히 재시작하지 않은 경우가 대부분입니다.** pypdf는 어떤 암호화 라이브러리를 쓸지 프로그램이 처음 켜질 때 딱 한 번만 정하고 그 상태를 계속 씁니다. 브라우저 새로고침이나 Streamlit 자동 새로고침으로는 반영되지 않습니다 — `run.bat`이 떠 있는 **터미널 창을 닫고**(또는 Ctrl+C) `run.bat`을 **다시 실행**하세요. `python cli.py doctor`의 `PDF 암호화 처리` 줄이 `cryptography ... (정상)`으로 바뀌면 해결된 것입니다 |
-| "로컬 LLM('...')에 연결하지 못해 답변 문장을 만들지 못했습니다" | 정상 동작입니다 — 답변 생성용 모델이 아직 설치되지 않았다는 뜻입니다. `ollama pull qwen2.5:7b-instruct` 실행 후 다시 질문하세요(bge-m3는 검색용이라 별개로 필요) |
+| PDF 업로드 시 `cryptography>=3.1 is required for AES algorithm` 오류로 화면 전체가 멈춤 | **`run.bat`을 다시 실행**하세요(최신 `run.bat`은 실행할 때마다 `requirements.txt`를 자동으로 다시 설치합니다). 터미널에 직접 `pip install`을 입력하지 마세요 |
+| `cryptography`를 설치했는데도 같은 경고가 계속 나옴 | 십중팔구 **설치한 곳과 GuideBot이 쓰는 파이썬이 다릅니다.** `pip install cryptography`의 출력에 `...\Python\Python3xx\...` 처럼 경로가 나온다면 그건 시스템 전역 파이썬이지 이 프로젝트의 `.venv`가 아닙니다. 해결: 터미널에 직접 설치하지 말고 **`run.bat`을 다시 실행**하세요 — 실행할 때마다 `.venv` 안에 필요한 라이브러리를 자동으로 맞춰 설치합니다. `python cli.py doctor`의 `Python 실행 파일` 줄이 `...\.venv\Scripts\python.exe`로, `PDF 암호화 처리` 줄이 `cryptography ... (정상)`으로 나오면 해결된 것입니다 |
+| "로컬 LLM('...')에 연결하지 못해 답변 문장을 만들지 못했습니다" | 답변 생성용 모델이 설치되지 않았다는 뜻입니다. `ollama pull qwen2.5:7b-instruct` 실행 후 다시 질문하세요(bge-m3는 검색 전용이라 별도 모델이 필요합니다) |
+| "선택된 LLM 모델은 임베딩 전용 모델입니다" / bge-m3를 LLM 모델로 지정했는데 답변이 안 됨 | **bge-m3는 답변을 생성할 수 없는 검색 전용 모델입니다.** Settings에서 **LLM 모델**을 `qwen2.5:7b-instruct` 같은 대화형 모델로 바꾸세요(`ollama pull qwen2.5:7b-instruct` 먼저 설치). bge-m3는 **Embedding 모델(Ollama)** 칸에 그대로 두면 됩니다 — 위 "LLM 모델" 절 참고 |
 | 맞는 답변인데 문장이 자꾸 제외됨 | Settings → "답변 문장의 문서 일치 최소 비율"을 0.35 정도로 낮춤 |
 | 정상 질문인데 "지침문서 내용만 답변합니다"로 거부됨 | 질문에서 "무시", "아는 대로" 같은 표현을 빼고 다시 질문 |
 | 답변이 느림 | 더 작은 LLM 모델 사용(`qwen2.5:3b-instruct`), Top-K를 3으로 낮춤 |
