@@ -10,7 +10,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .logging_setup import get_logger
 from .structure import split_lines_by_heading
+
+logger = get_logger("extract")
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".xlsx", ".pptx"}
 
@@ -92,6 +95,18 @@ def extract_txt(path: Path) -> ExtractedDocument:
     return ExtractedDocument(blocks=blocks, page_count=1)
 
 
+def _pdf_read_error_message(exc: Exception) -> str:
+    """pypdf 예외를 사용자가 조치할 수 있는 메시지로 바꾼다."""
+    text = f"{exc.__class__.__name__}: {exc}".lower()
+    if "cryptography" in text or "dependencyerror" in exc.__class__.__name__.lower():
+        return (
+            "이 PDF는 암호화(AES)되어 있는데, 이를 해독할 라이브러리(cryptography)가 "
+            "설치되어 있지 않습니다. 터미널에서 다음을 실행한 뒤 다시 시도하세요:\n"
+            "  pip install cryptography"
+        )
+    return f"PDF를 읽는 중 오류가 발생했습니다({exc.__class__.__name__}). 파일이 손상되었는지 확인하세요."
+
+
 def extract_pdf(path: Path) -> ExtractedDocument:
     pypdf = _require("pypdf", "pypdf")
     try:
@@ -112,16 +127,28 @@ def extract_pdf(path: Path) -> ExtractedDocument:
         except ExtractionError:
             raise
         except Exception as exc:
-            raise ExtractionError(
-                "암호로 보호된 PDF라 내용을 읽을 수 없습니다. 암호를 해제한 사본을 등록해 주세요."
-            ) from exc
+            # decrypt("")는 인증만 확인하며, 실제 내용을 읽을 때(AES) cryptography가
+            # 없으면 여기서도 DependencyError가 날 수 있다.
+            raise ExtractionError(_pdf_read_error_message(exc)) from exc
+
+    # reader.pages 에 처음 접근하는 순간 내부적으로 페이지 수/객체를 복호화한다.
+    # cryptography 패키지가 없으면 여기서 pypdf.errors.DependencyError가 발생한다.
+    try:
+        page_count = len(reader.pages)
+    except Exception as exc:
+        raise ExtractionError(_pdf_read_error_message(exc)) from exc
 
     blocks: list[Block] = []
     failed_pages = 0
-    for page_no, page in enumerate(reader.pages, start=1):
+    for page_no in range(1, page_count + 1):
         try:
+            page = reader.pages[page_no - 1]
             text = page.extract_text() or ""
-        except Exception:
+        except Exception as exc:
+            # 특정 페이지만 손상된 경우 문서 전체를 포기하지 않고 건너뛴다.
+            logger.warning(
+                "pdf page read failed: page=%d error=%s", page_no, exc.__class__.__name__
+            )
             text = ""
             failed_pages += 1
         for paragraph in _split_paragraphs(text):
@@ -136,7 +163,6 @@ def extract_pdf(path: Path) -> ExtractedDocument:
                     )
                 )
 
-    page_count = len(reader.pages)
     total_chars = sum(len(b.text) for b in blocks)
 
     # 추출된 글자가 사실상 없을 때만 거부한다(이미지로만 이루어진 문서).

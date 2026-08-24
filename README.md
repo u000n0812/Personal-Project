@@ -319,7 +319,7 @@ Personal-Project/
 │  ├─ backup.py         zip 백업·복원
 │  └─ service.py        구성 요소 조립 + 상태 점검
 ├─ sample_docs/         테스트용 예시 SOP + 평가 질문 22개
-├─ tests/               자동 테스트 (87개)
+├─ tests/               자동 테스트 (92개)
 └─ data/                실행 시 자동 생성 (문서·Index·DB·로그)
 ```
 
@@ -359,6 +359,8 @@ Personal-Project/
 | PDF 등록 실패 | `python cli.py inspect "파일경로"` 로 원인 확인(암호 보호 / 텍스트 없음 / 페이지별 추출량) |
 | 이미지·스캔 PDF 등록 실패 | 원본 파일(DOCX/PPTX)을 등록하거나, OCR 처리한 PDF 사본을 등록 |
 | 암호가 걸린 PDF 등록 실패 | 빈 암호는 자동 처리됩니다. 실제 암호가 걸린 파일은 암호를 해제한 사본을 등록 |
+| PDF 업로드 시 `cryptography>=3.1 is required for AES algorithm` 오류로 화면 전체가 멈춤 | `pip install cryptography` 실행 후 다시 시도(최신 `requirements.txt`로 설치하면 자동 포함됨). 이미 받은 `.venv`가 있다면 `.venv\Scripts\activate` 후 `pip install -r requirements.txt`로 갱신 |
+| "로컬 LLM('...')에 연결하지 못해 답변 문장을 만들지 못했습니다" | 정상 동작입니다 — 답변 생성용 모델이 아직 설치되지 않았다는 뜻입니다. `ollama pull qwen2.5:7b-instruct` 실행 후 다시 질문하세요(bge-m3는 검색용이라 별개로 필요) |
 | 맞는 답변인데 문장이 자꾸 제외됨 | Settings → "답변 문장의 문서 일치 최소 비율"을 0.35 정도로 낮춤 |
 | 정상 질문인데 "지침문서 내용만 답변합니다"로 거부됨 | 질문에서 "무시", "아는 대로" 같은 표현을 빼고 다시 질문 |
 | 답변이 느림 | 더 작은 LLM 모델 사용(`qwen2.5:3b-instruct`), Top-K를 3으로 낮춤 |

@@ -139,6 +139,43 @@ class IngestRagTest(unittest.TestCase):
         self.assertFalse(stored_path.exists())
         self.assertEqual(self.db.stats()["chunks"], 0)
 
+    def test_unexpected_exception_does_not_crash_registration(self):
+        """예상 못한 예외(라이브러리 버그 등)가 나도 register_file은 예외를 던지지 않는다.
+
+        실제 사례: pypdf가 cryptography 미설치로 DependencyError를 던졌는데,
+        이게 어디서도 잡히지 않아 Streamlit 앱 전체가 죽었다. register_file은
+        어떤 예외든 IngestResult(status="error")로 바꿔야 한다.
+        """
+        from unittest.mock import patch
+
+        path = self._write("SOP_Broken_v1.0.txt")
+        with patch("guidebot.ingest.extract_document", side_effect=RuntimeError("boom")):
+            result = self.ingestor.register_file(path)   # 예외를 던지면 테스트 실패
+
+        self.assertEqual(result.status, "error")
+        self.assertIn("RuntimeError", result.message)
+
+    def test_batch_registration_continues_after_one_file_crashes(self):
+        """배치 등록 중 한 파일이 예상 못한 예외를 내도 나머지 파일은 계속 처리된다."""
+        from unittest.mock import patch
+
+        broken = self._write("SOP_Broken_v1.0.txt")
+        healthy = self._write("SOP_ExternalData_v2.1.txt")
+
+        from guidebot.extract import extract_document as real_extract_document
+
+        def flaky_extract(target_path):
+            if target_path == broken:
+                raise RuntimeError("boom")
+            return real_extract_document(target_path)
+
+        with patch("guidebot.ingest.extract_document", side_effect=flaky_extract):
+            results = self.ingestor.register_paths([broken, healthy])
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].status, "error")
+        self.assertTrue(results[1].ok)
+
     def test_reindex_keeps_document(self):
         result = self.ingestor.register_file(self._write("SOP_ExternalData_v2.1.txt"))
         reindexed = self.ingestor.reindex(result.document_id)

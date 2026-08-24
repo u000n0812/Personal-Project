@@ -120,7 +120,28 @@ class DocumentIngestor:
     # 등록
     # ------------------------------------------------------------------
     def register_file(self, path: Path | str) -> IngestResult:
+        """문서 1건을 등록한다. 예상치 못한 오류가 나도 예외를 밖으로 던지지 않는다.
+
+        문서 하나의 처리 실패(라이브러리 버그, 손상된 파일 등)가 배치 등록 전체나
+        Streamlit 앱 전체를 죽이지 않도록 하는 최종 방어선이다. 흔한 실패
+        (형식 오류, Embedding 실패 등)는 아래 _register_file_unsafe에서 이미
+        구체적인 메시지로 처리하며, 여기서는 그 외의 모든 예외를 잡는다.
+        """
         path = Path(path)
+        try:
+            return self._register_file_unsafe(path)
+        except Exception as exc:  # noqa: BLE001 - 의도적으로 모든 예외를 막는다
+            logger.error(
+                "register_file crashed: file=%s error=%s",
+                safe_file_name(path.name), exc.__class__.__name__,
+            )
+            return IngestResult(
+                path.name, "error",
+                f"등록 중 예상치 못한 오류가 발생했습니다({exc.__class__.__name__}). "
+                "로그(data/logs/guidebot.log)를 확인하거나 다른 파일로 다시 시도해 주세요.",
+            )
+
+    def _register_file_unsafe(self, path: Path) -> IngestResult:
         if not path.exists() or not path.is_file():
             return IngestResult(path.name, "error", "파일을 찾을 수 없습니다.")
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:

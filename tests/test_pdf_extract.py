@@ -4,8 +4,9 @@ import base64
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from guidebot.extract import ExtractionError, extract_document
+from guidebot.extract import ExtractionError, _pdf_read_error_message, extract_document
 
 try:
     import pypdf
@@ -82,6 +83,46 @@ class PdfExtractionTest(unittest.TestCase):
         document = extract_document(path)
         self.assertTrue(document.warning, "텍스트가 적으면 경고가 있어야 한다")
         self.assertIn("텍스트가 적게", document.warning)
+
+    def test_missing_cryptography_dependency_gives_actionable_message(self):
+        """cryptography 미설치로 AES 복호화가 실패하는 상황을 흉내낸다.
+
+        실제로는 pypdf.errors.DependencyError가 나지만, 이 환경에는
+        cryptography가 설치돼 있으므로 reader.pages 접근 자체를 모킹해
+        같은 상황(페이지 접근 시 예외)을 재현한다.
+        """
+
+        class FakeDependencyError(Exception):
+            pass
+
+        mock_pages = MagicMock()
+        mock_pages.__len__.side_effect = FakeDependencyError(
+            "cryptography>=3.1 is required for AES algorithm"
+        )
+        mock_reader = MagicMock(is_encrypted=False, pages=mock_pages)
+
+        path = write_pdf(self.dir, "aes.pdf", PLAIN_PDF_B64)   # 내용은 모킹되므로 무관
+        with patch("pypdf.PdfReader", return_value=mock_reader):
+            with self.assertRaises(ExtractionError) as caught:
+                extract_document(path)
+
+        message = str(caught.exception)
+        self.assertIn("cryptography", message)
+        self.assertIn("pip install cryptography", message)
+
+    def test_pdf_read_error_message_detects_dependency_error_by_class_name(self):
+        """메시지에 'cryptography'가 없어도 예외 클래스명이 DependencyError면 안내한다."""
+
+        class DependencyError(Exception):
+            pass
+
+        message = _pdf_read_error_message(DependencyError("some backend missing"))
+        self.assertIn("pip install cryptography", message)
+
+    def test_other_pdf_errors_get_generic_message(self):
+        message = _pdf_read_error_message(ValueError("unexpected EOF"))
+        self.assertNotIn("cryptography", message)
+        self.assertIn("PDF를 읽는 중 오류", message)
 
 
 if __name__ == "__main__":
