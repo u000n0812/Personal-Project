@@ -24,7 +24,7 @@ def create_backup(target_dir: Path | str | None = None) -> Path:
     target_dir = Path(target_dir) if target_dir else BACKUP_DIR
     target_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    archive_path = target_dir / f"sopbot_backup_{stamp}.zip"
+    archive_path = target_dir / f"guidebot_backup_{stamp}.zip"
 
     file_count = 0
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -65,4 +65,7 @@ def list_backups(target_dir: Path | str | None = None) -> list[Path]:
     target_dir = Path(target_dir) if target_dir else BACKUP_DIR
     if not target_dir.exists():
         return []
-    return sorted(target_dir.glob("sopbot_backup_*.zip"), reverse=True)
+    # 이전 이름으로 만들어 둔 백업도 함께 보여준다.
+    archives = list(target_dir.glob("guidebot_backup_*.zip"))
+    archives.extend(target_dir.glob("sopbot_backup_*.zip"))
+    return sorted(archives, key=lambda p: p.name.split("_backup_")[-1], reverse=True)

@@ -26,9 +26,11 @@ class SearchResult:
 
     chunk: Chunk
     document: Document
-    score: float           # 결합 점수 (0~1)
-    vector_score: float    # cosine 유사도 원점수
-    keyword_score: float   # BM25 원점수
+    score: float            # 순위 결정용 결합 점수(검색 결과 안에서의 상대 점수)
+    vector_score: float     # cosine 유사도 원점수
+    keyword_score: float    # BM25 원점수
+    confidence: float = 0.0  # 0~1 절대 신뢰도. 화면의 '유사도'이며 답변 방식 결정에 사용
+    token_coverage: float = 0.0  # 질문 단어가 이 chunk에서 확인된 비율
 
     @property
     def page_label(self) -> str:
@@ -156,19 +158,42 @@ class Retriever:
         results: list[SearchResult] = []
         for chunk_id, score in ranked:
             chunk, document = records[chunk_id]
+            vector_score = round(float(vector_raw.get(chunk_id, 0.0)), 4)
+            # 질문 단어가 이 chunk에서 실제로 확인되는 비율(모델과 무관한 신호)
+            chunk_coverage = coverage(query, [chunk.text, chunk.heading_path])
             results.append(
                 SearchResult(
                     chunk=chunk,
                     document=document,
                     score=round(float(score), 4),
-                    vector_score=round(float(vector_raw.get(chunk_id, 0.0)), 4),
+                    vector_score=vector_score,
                     keyword_score=round(float(keyword_raw.get(chunk_id, 0.0)), 4),
+                    confidence=self.confidence_of(vector_score, chunk_coverage),
+                    token_coverage=round(chunk_coverage, 4),
                 )
             )
         logger.info("search done: candidates=%d returned=%d", len(combined), len(results))
         return results
 
     # ------------------------------------------------------------------
+    def confidence_of(self, vector_score: float, token_coverage: float) -> float:
+        """0~1 절대 신뢰도.
+
+        Embedding 모델마다 cosine 분포가 다르므로 모델 threshold를 기준으로 환산한 뒤,
+        의미 유사도(vector)와 단어 일치(coverage) 중 더 강한 신호를 신뢰도로 삼는다.
+        - 0.9 이상 : 질문에 해당하는 내용을 찾음
+        - 0.5 이상 : 유사한 내용을 찾음(원문 확인 필요)
+        - 0.5 미만 : 근거 부족
+        """
+        threshold = self.effective_threshold
+        low, high = threshold * 0.6, threshold + 0.15
+        span = max(high - low, 1e-6)
+        vector_part = (vector_score - low) / span
+        # coverage는 '근거 있음' 기준(min_keyword_coverage)이 0.5가 되도록 환산한다.
+        coverage_base = max(self.settings.min_keyword_coverage, 1e-6) * 2
+        coverage_part = token_coverage / coverage_base
+        return round(min(1.0, max(0.0, max(vector_part, coverage_part))), 4)
+
     @property
     def effective_threshold(self) -> float:
         """설정값이 0(자동)이면 Embedding 모델의 권장 threshold를 사용한다."""
@@ -185,6 +210,20 @@ class Retriever:
         token_coverage = coverage(query, [r.chunk.text for r in results])
         return best_vector, token_coverage
 
+    def confidence_level(self, results: list[SearchResult], query: str = "") -> str:
+        """검색 결과의 신뢰도 등급을 돌려준다: high | medium | low."""
+        if not results:
+            return "low"
+        best = max(r.confidence for r in results)
+        # 질문 전체 기준 coverage(여러 chunk 합산)도 함께 본다.
+        _, whole_coverage = self.evidence_scores(query, results)
+        best = max(best, self.confidence_of(0.0, whole_coverage))
+        if best >= self.settings.high_confidence:
+            return "high"
+        if best >= self.settings.medium_confidence:
+            return "medium"
+        return "low"
+
     def has_sufficient_evidence(self, results: list[SearchResult], query: str = "") -> bool:
         """근거로 삼기에 충분한 검색 결과인지 판단한다(Hallucination 방지).
 
@@ -194,11 +233,7 @@ class Retriever:
         """
         if not results:
             return False
-        best_vector, token_coverage = self.evidence_scores(query, results)
-        return (
-            best_vector >= self.effective_threshold
-            or token_coverage >= self.settings.min_keyword_coverage
-        )
+        return self.confidence_level(results, query) != "low"
 
     def invalidate(self) -> None:
         """문서가 추가/삭제된 뒤 Keyword Index를 다시 만들도록 표시한다."""

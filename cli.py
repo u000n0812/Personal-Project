@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""지침문서 어시스턴트 명령줄 도구.
+"""GuideBot 명령줄 도구.
 
 UI 없이 각 단계(Phase)를 점검하거나 문서를 일괄 등록할 때 사용한다.
 
@@ -22,11 +22,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sopbot import backup as backup_module  # noqa: E402
-from sopbot.config import DATA_DIR, Settings  # noqa: E402
-from sopbot.db import STATUS_ACTIVE, STATUS_DISABLED  # noqa: E402
-from sopbot.security import scan_source_tree  # noqa: E402
-from sopbot.service import AppService  # noqa: E402
+from guidebot import backup as backup_module  # noqa: E402
+from guidebot.config import DATA_DIR, Settings  # noqa: E402
+from guidebot.db import STATUS_ACTIVE, STATUS_DISABLED  # noqa: E402
+from guidebot.security import scan_source_tree  # noqa: E402
+from guidebot.service import AppService  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -219,6 +219,64 @@ EMBED_PROBES = [
 ]
 
 
+def cmd_inspect(args: argparse.Namespace) -> int:
+    """등록에 실패한 문서가 어떤 상태인지 확인한다."""
+    from guidebot.extract import SUPPORTED_EXTENSIONS, ExtractionError, extract_document
+
+    path = Path(args.path)
+    print(f"파일     : {path.name}")
+    if not path.exists():
+        print("결과     : 파일을 찾을 수 없습니다.")
+        return 1
+    print(f"크기     : {path.stat().st_size:,} bytes")
+    print(f"확장자   : {path.suffix.lower()}"
+          f"{'' if path.suffix.lower() in SUPPORTED_EXTENSIONS else '  ← 지원하지 않는 형식'}")
+
+    if path.suffix.lower() == ".pdf":
+        try:
+            import pypdf
+
+            reader = pypdf.PdfReader(str(path))
+            encrypted = bool(getattr(reader, "is_encrypted", False))
+            print(f"암호보호 : {'예' if encrypted else '아니오'}", end="")
+            if encrypted:
+                opened = False
+                try:
+                    opened = bool(reader.decrypt(""))
+                except Exception:
+                    opened = False
+                print(f" (빈 암호로 해제 {'가능' if opened else '불가'})")
+            else:
+                print()
+            print(f"페이지   : {len(reader.pages)}쪽")
+            print("\n페이지별 추출 글자 수:")
+            for page_no, page in enumerate(reader.pages, start=1):
+                try:
+                    length = len((page.extract_text() or "").strip())
+                except Exception as exc:
+                    print(f"  {page_no:>3}쪽: 읽기 실패({exc.__class__.__name__})")
+                    continue
+                bar = "#" * min(40, length // 20)
+                print(f"  {page_no:>3}쪽: {length:>6}자 {bar}")
+        except Exception as exc:
+            print(f"PDF 분석 실패: {exc.__class__.__name__}")
+
+    print("\n등록 시뮬레이션:")
+    try:
+        document = extract_document(path)
+        chars = sum(len(b.text) for b in document.blocks)
+        print(f"  성공 - 총 {chars:,}자 / {document.page_count}쪽 / 블록 {len(document.blocks)}개")
+        if document.warning:
+            print(f"  주의 - {document.warning}")
+        headings = [b.text for b in document.blocks if b.kind == "heading"][:5]
+        if headings:
+            print("  인식된 제목: " + " | ".join(headings))
+        return 0
+    except ExtractionError as exc:
+        print(f"  실패 - {exc}")
+        return 1
+
+
 def cmd_embed_check(args: argparse.Namespace) -> int:
     """Embedding 모델이 관련 문장과 무관한 문장을 구분하는지 확인한다."""
     service = _service(warn=False)
@@ -292,7 +350,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="cli.py", description="사내 지침문서 Local RAG 어시스턴트 (완전 로컬 실행)"
+        prog="cli.py", description="GuideBot - 사내 지침문서 조회 챗봇 (완전 로컬 실행)"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -343,6 +401,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "embed-check", help="Embedding 모델 분별력 점검 및 threshold 권장값 확인"
     ).set_defaults(func=cmd_embed_check)
+
+    inspect_parser = sub.add_parser("inspect", help="등록 실패한 문서 진단(페이지별 추출량 확인)")
+    inspect_parser.add_argument("path", help="확인할 문서 경로")
+    inspect_parser.set_defaults(func=cmd_inspect)
 
     eval_parser = sub.add_parser("eval", help="질문 목록으로 검색 품질 점검")
     eval_parser.add_argument("--file", default="sample_docs/eval_questions.json")

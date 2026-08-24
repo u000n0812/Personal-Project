@@ -2,7 +2,7 @@
 
 import unittest
 
-from sopbot import security
+from guidebot import security
 from tests import PROJECT_ROOT
 
 # 소스 검사기가 "외부 URL"로 오탐하지 않도록 문자열을 조립해서 만든다.

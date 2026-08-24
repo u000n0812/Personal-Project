@@ -11,8 +11,8 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from sopbot.llm import ChatMessage, LLMError, OllamaClient
-from sopbot.security import ExternalConnectionBlocked
+from guidebot.llm import ChatMessage, LLMError, OllamaClient
+from guidebot.security import ExternalConnectionBlocked
 
 RECEIVED: list[dict] = []
 
@@ -139,7 +139,7 @@ class LlmClientTest(unittest.TestCase):
             offline.chat([ChatMessage("user", "질문")], model="any")
 
     def test_bge_m3_embedder_uses_batch_endpoint(self):
-        from sopbot.embed import OllamaEmbedder
+        from guidebot.embed import OllamaEmbedder
 
         embedder = OllamaEmbedder(self.host, "bge-m3", timeout=10)
         self.assertEqual(embedder.dimension, BGE_M3_DIM)
@@ -159,7 +159,7 @@ class LlmClientTest(unittest.TestCase):
             self.assertAlmostEqual(sum(v * v for v in vector), 1.0, places=5)
 
     def test_embedder_falls_back_to_legacy_endpoint(self):
-        from sopbot.embed import OllamaEmbedder
+        from guidebot.embed import OllamaEmbedder
 
         SUPPORT_BATCH_EMBED[0] = False   # 구버전 Ollama 상황
         embedder = OllamaEmbedder(self.host, "bge-m3", timeout=10)
@@ -171,13 +171,13 @@ class LlmClientTest(unittest.TestCase):
         self.assertTrue(all(item["path"] == "/api/embeddings" for item in RECEIVED))
 
     def test_bge_m3_suggested_threshold(self):
-        from sopbot.embed import OllamaEmbedder
+        from guidebot.embed import OllamaEmbedder
 
         embedder = OllamaEmbedder(self.host, "bge-m3", timeout=10)
         self.assertAlmostEqual(embedder.suggested_threshold, 0.5)
 
     def test_missing_model_reports_pull_command(self):
-        from sopbot.embed import EmbeddingError, OllamaEmbedder
+        from guidebot.embed import EmbeddingError, OllamaEmbedder
 
         with self.assertRaises(EmbeddingError) as caught:
             OllamaEmbedder(self.host, "없는모델", timeout=10)

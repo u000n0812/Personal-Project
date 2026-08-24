@@ -53,7 +53,19 @@ class OllamaClient:
         try:
             return self._opener.open(request, timeout=self.timeout)
         except urllib.error.HTTPError as exc:
-            raise LLMError(f"로컬 LLM 오류 (HTTP {exc.code})") from exc
+            detail = ""
+            try:
+                body = exc.read().decode("utf-8", errors="replace")
+                detail = json.loads(body).get("error", "")[:200]
+            except Exception:
+                detail = ""
+            model = (payload or {}).get("model", "")
+            if exc.code == 404 and model:
+                raise LLMError(
+                    f"모델 '{model}' 을(를) 찾을 수 없습니다. "
+                    f"터미널에서 설치하세요:  ollama pull {model}"
+                ) from exc
+            raise LLMError(f"로컬 LLM 오류 (HTTP {exc.code}){': ' + detail if detail else ''}") from exc
         except (urllib.error.URLError, OSError) as exc:
             raise LLMError(
                 "로컬 LLM에 연결하지 못했습니다. Ollama가 실행 중인지 확인하세요 "

@@ -1,4 +1,4 @@
-"""사내 지침문서 Local RAG 어시스턴트.
+"""GuideBot - 사내 지침문서 Local RAG 챗봇.
 
 모든 처리는 로컬 PC 내부에서만 수행한다(외부 AI API 사용 금지).
 """

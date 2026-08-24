@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 사내 지침문서 어시스턴트 실행 (macOS / Linux)
+# GuideBot - 사내 지침문서 조회 챗봇 실행 (macOS / Linux)
 set -e
 cd "$(dirname "$0")"
 

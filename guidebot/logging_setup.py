@@ -31,7 +31,7 @@ class _TruncateFilter(logging.Filter):
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
     """파일 + 콘솔 로거를 준비한다(중복 설정 방지)."""
     global _CONFIGURED
-    logger = logging.getLogger("sopbot")
+    logger = logging.getLogger("guidebot")
     if _CONFIGURED:
         return logger
 
@@ -42,7 +42,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
 
     file_handler = RotatingFileHandler(
-        LOGS_DIR / "sopbot.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+        LOGS_DIR / "guidebot.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
     file_handler.addFilter(_TruncateFilter())
@@ -57,6 +57,6 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     return logger
 
 
-def get_logger(name: str = "sopbot") -> logging.Logger:
+def get_logger(name: str = "guidebot") -> logging.Logger:
     setup_logging()
-    return logging.getLogger(name if name.startswith("sopbot") else f"sopbot.{name}")
+    return logging.getLogger(name if name.startswith("guidebot") else f"guidebot.{name}")

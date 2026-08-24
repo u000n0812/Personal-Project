@@ -1,4 +1,4 @@
-"""사내 지침문서 어시스턴트 - 로컬 Web UI (Streamlit).
+"""GuideBot - 사내 지침문서 조회 챗봇 (로컬 Web UI).
 
 실행:  python -m streamlit run app.py
 접속:  http://127.0.0.1:8501  (127.0.0.1에만 Binding, 외부 접근 불가)
@@ -8,26 +8,28 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
+import webbrowser
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sopbot.backup import create_backup, list_backups  # noqa: E402
-from sopbot.config import (  # noqa: E402
+from guidebot.backup import create_backup, list_backups  # noqa: E402
+from guidebot.config import (  # noqa: E402
     BACKUP_DIR,
     DATA_DIR,
     Settings,
     ensure_dirs,
 )
-from sopbot.db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED  # noqa: E402
-from sopbot.extract import SUPPORTED_EXTENSIONS  # noqa: E402
-from sopbot.rag import postprocess_answer  # noqa: E402  (strict_mode 해제 시 사용)
-from sopbot.service import AppService  # noqa: E402
+from guidebot.db import STATUS_ACTIVE, STATUS_DISABLED, STATUS_SUPERSEDED  # noqa: E402
+from guidebot.extract import SUPPORTED_EXTENSIONS  # noqa: E402
+from guidebot.rag import postprocess_answer  # noqa: E402  (strict_mode 해제 시 사용)
+from guidebot.service import AppService  # noqa: E402
 
 STATUS_LABEL = {
     STATUS_ACTIVE: "🟢 활성(최신)",
@@ -42,11 +44,55 @@ def get_service() -> AppService:
     return AppService(Settings.load())
 
 
+ACROBAT_CANDIDATES = (
+    r"C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+    r"C:\Program Files (x86)\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+    r"C:\Program Files\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+    r"C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+    r"C:\Program Files (x86)\Adobe\Reader 11.0\Reader\AcroRd32.exe",
+)
+
+
+def _open_pdf_at_page(target: Path, page: int) -> str | None:
+    """PDF를 지정한 페이지에서 연다. 성공하면 안내 문구, 실패하면 None."""
+    system = platform.system()
+
+    # 1순위: Adobe Acrobat/Reader (페이지 지정 옵션을 정식 지원)
+    if system == "Windows":
+        executables = [path for path in ACROBAT_CANDIDATES if Path(path).exists()]
+        found = shutil.which("AcroRd32.exe") or shutil.which("Acrobat.exe")
+        if found:
+            executables.append(found)
+        for executable in executables:
+            try:
+                subprocess.Popen([executable, "/A", f"page={page}", str(target)])
+                return f"{page} 페이지로 문서를 열었습니다."
+            except OSError:
+                continue
+
+    # 2순위: 기본 브라우저(Edge/Chrome/Firefox 모두 #page= 앵커를 지원)
+    try:
+        if webbrowser.open(f"{target.resolve().as_uri()}#page={page}"):
+            return f"{page} 페이지로 문서를 열었습니다(브라우저 PDF 뷰어)."
+    except Exception:
+        pass
+    return None
+
+
 def open_local_file(path: str, page: int | None = None) -> str:
-    """등록된 원본 문서를 로컬 뷰어로 연다(외부 전송 없음)."""
+    """등록된 원본 문서를 로컬 뷰어로 연다(외부 전송 없음).
+
+    PDF이고 페이지를 알고 있으면 해당 페이지에서 바로 열리도록 시도한다.
+    """
     target = Path(path)
     if not target.exists():
         return "파일을 찾을 수 없습니다(삭제되었거나 이동됨)."
+
+    if target.suffix.lower() == ".pdf" and page and page > 0:
+        message = _open_pdf_at_page(target, page)
+        if message:
+            return message
+
     try:
         system = platform.system()
         if system == "Windows":
@@ -57,8 +103,10 @@ def open_local_file(path: str, page: int | None = None) -> str:
             subprocess.Popen(["xdg-open", str(target)])
     except OSError as exc:
         return f"문서를 열지 못했습니다: {exc.__class__.__name__}"
-    hint = f" ({page} 페이지 참고)" if page else ""
-    return f"문서를 열었습니다{hint}."
+
+    if page:
+        return f"문서를 열었습니다. ({page} 페이지를 확인하세요)"
+    return "문서를 열었습니다."
 
 
 def render_sources(results, key_prefix: str) -> None:
@@ -68,10 +116,11 @@ def render_sources(results, key_prefix: str) -> None:
     st.markdown("**[참고한 문서]**")
     for index, result in enumerate(results, start=1):
         document = result.document
+        badge = "✅" if result.confidence >= 0.9 else ("🔎" if result.confidence >= 0.5 else "•")
         header = (
-            f"{index}. {document.title} v{document.version}"
+            f"{index}. {badge} {document.title} v{document.version}"
             f"{' / ' + result.page_label if result.page_label else ''}"
-            f"  ·  유사도 {result.score:.2f}"
+            f"  ·  유사도 {result.confidence:.2f}"
         )
         with st.expander(header):
             if result.chunk.section:
@@ -79,12 +128,15 @@ def render_sources(results, key_prefix: str) -> None:
             st.caption(
                 f"파일: {document.file_name}  |  vector {result.vector_score:.3f}"
                 f"  |  keyword {result.keyword_score:.2f}"
+                f"  |  단어일치 {result.token_coverage:.2f}"
             )
             st.text(result.chunk.text)
             columns = st.columns([1, 3])
             with columns[0]:
-                if st.button("문서 열기", key=f"{key_prefix}_open_{index}"):
-                    st.info(open_local_file(document.stored_path, result.chunk.page_start))
+                page = result.chunk.page_start
+                label = f"문서 열기 ({page}p)" if page else "문서 열기"
+                if st.button(label, key=f"{key_prefix}_open_{index}"):
+                    st.info(open_local_file(document.stored_path, page))
             with columns[1]:
                 stored = Path(document.stored_path)
                 if stored.exists():
@@ -127,15 +179,19 @@ def page_chat(service: AppService) -> None:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         with st.spinner("지침문서를 검색하는 중..."):
-            stream, results, evidence = service.engine.answer_stream(question, history_pairs)
+            stream, results, evidence, state = service.engine.answer_stream(question, history_pairs)
         collected = ""
         for piece in stream:
             collected += piece
             placeholder.markdown(collected)
         report = None
-        if evidence == "ok" and results:
+        if state.error and results:
+            collected, report = service.engine.finalize_stream(collected, results, state)
+            placeholder.markdown(collected)
+            st.error("로컬 LLM 호출에 실패했습니다. 사이드바의 LLM 상태를 확인하세요.")
+        elif evidence == "ok" and results:
             # 문서에 근거가 없는 문장을 제거하고, 출처를 실제 검색 결과로 교체한다.
-            collected, report = service.engine.finalize_stream(collected, results)
+            collected, report = service.engine.finalize_stream(collected, results, state)
             placeholder.markdown(collected)
             if report is None:
                 collected = postprocess_answer(collected, results)
@@ -165,7 +221,7 @@ def page_documents(service: AppService) -> None:
             accept_multiple_files=True,
         )
         if uploaded and st.button("선택한 파일 등록", type="primary"):
-            temp_dir = Path(tempfile.mkdtemp(prefix="sopbot_upload_"))
+            temp_dir = Path(tempfile.mkdtemp(prefix="guidebot_upload_"))
             paths = []
             for item in uploaded:
                 target = temp_dir / item.name
@@ -292,6 +348,17 @@ def page_settings(service: AppService) -> None:
             f"현재 적용 중인 threshold: {service.retriever.effective_threshold:.2f} "
             f"(Embedding: {service.embedder.name})"
         )
+        high_confidence = st.slider(
+            "‘찾았습니다’로 답할 유사도", 0.5, 1.0, float(settings.high_confidence), 0.05,
+            help="이 값 이상이면 질문에 해당하는 지침을 찾은 것으로 보고 바로 답변한다.",
+        )
+        medium_confidence = st.slider(
+            "‘유사한 내용’으로 안내할 최소 유사도", 0.1, 0.9, float(settings.medium_confidence), 0.05,
+            help=(
+                "이 값 이상 ~ 위 값 미만이면 '유사한 내용을 찾았습니다. 확인해 주세요'를 함께 안내한다. "
+                "이 값 미만이면 근거 부족으로 답변하지 않는다."
+            ),
+        )
         min_coverage = st.slider(
             "질문 단어 일치 최소 비율", 0.0, 1.0, float(settings.min_keyword_coverage), 0.05,
             help="질문에 쓰인 단어가 검색 결과에서 확인된 비율. Embedding 모델과 무관한 보조 판단 기준.",
@@ -338,6 +405,8 @@ def page_settings(service: AppService) -> None:
             keyword_weight=settings.keyword_weight,
             min_keyword_coverage=min_coverage,
             min_score_ratio=settings.min_score_ratio,
+            high_confidence=high_confidence,
+            medium_confidence=medium_confidence,
             strict_mode=strict_mode,
             min_sentence_support=min_sentence_support,
             include_superseded=include_superseded,
@@ -383,11 +452,12 @@ def page_settings(service: AppService) -> None:
 
 # ---------------------------------------------------------------------------
 def main() -> None:
-    st.set_page_config(page_title="사내 지침문서 어시스턴트", page_icon="📘", layout="wide")
+    st.set_page_config(page_title="GuideBot", page_icon="📘", layout="wide")
     service = get_service()
 
     with st.sidebar:
-        st.title("📘 지침문서 어시스턴트")
+        st.title("📘 GuideBot")
+        st.caption("사내 지침문서 조회 챗봇")
         st.caption("완전 로컬 실행 · 외부 전송 없음")
         menu = st.radio("메뉴", ["Chat", "Documents", "Settings"], label_visibility="collapsed")
 
@@ -396,6 +466,18 @@ def main() -> None:
         st.markdown(f"로컬 LLM: {'🟢 연결됨' if llm_ok else '🔴 연결 안 됨'}")
         if not llm_ok:
             st.caption("터미널에서 `ollama serve` 실행 후 새로고침하세요.")
+        else:
+            installed = service.client.list_models()
+            selected = service.settings.llm_model
+            ready = any(
+                m == selected or m.split(":")[0] == selected.split(":")[0] for m in installed
+            )
+            if not ready:
+                st.error(
+                    f"답변 생성용 LLM 모델 `{selected}` 이(가) 설치되어 있지 않습니다.\n\n"
+                    f"터미널에서 설치하세요:\n\n`ollama pull {selected}`\n\n"
+                    "설치된 모델: " + (", ".join(installed) if installed else "없음")
+                )
         stats = service.db.stats()
         st.markdown(f"문서 {stats['active_documents']}건 / Chunk {stats['chunks']}개")
         st.caption(f"Embedding: {service.embedder.name}")

@@ -1,4 +1,4 @@
-# 사내 지침문서 어시스턴트 (Local RAG Chatbot)
+# GuideBot — 사내 지침문서 조회 챗봇 (Local RAG)
 
 업무 중 "이 절차가 어떻게 되더라?" 싶을 때 **등록해 둔 지침문서·SOP·업무절차서**에서
 근거를 찾아 알려주는 **완전 로컬 실행** 챗봇입니다.
@@ -157,10 +157,22 @@ DB Lock 전에 확인해야 하는 항목이 뭐였지?
 ```
 
 - 이어서 묻기가 가능합니다. (`External Data 전달 절차 알려줘` → `그럼 Password는?`)
-- 답변 아래 **[참고한 문서]** 를 펼치면 실제 검색된 원문, 유사도, 페이지를 확인하고
-  **문서 열기** 버튼으로 원본을 바로 열 수 있습니다.
-- 근거를 찾지 못하면 지어내지 않고 이렇게 답합니다.
-  > 등록된 지침문서에서는 해당 내용을 확인하지 못했습니다.
+- 답변 아래 **[참고한 문서]** 를 펼치면 실제 검색된 원문, 유사도, 페이지를 확인할 수 있습니다.
+  **문서 열기 (5p)** 버튼을 누르면 PDF가 **해당 페이지에서 바로 열립니다.**
+  (Adobe Acrobat/Reader가 있으면 그것으로, 없으면 기본 브라우저의 PDF 뷰어로 엽니다.
+  PDF가 아닌 문서는 파일을 열고 확인할 페이지를 안내합니다.)
+- 답변은 **유사도 등급**에 따라 달라집니다.
+
+  | 유사도 | 답변 방식 |
+  |--------|-----------|
+  | **0.9 이상** | 찾은 지침 내용으로 바로 답변 |
+  | **0.5 ~ 0.9** | 답변 앞에 "유사한 내용을 찾았습니다. 원문을 함께 확인해 주세요" 안내 |
+  | **0.5 미만** | 답하지 않음 → "등록된 지침문서에서는 해당 내용을 확인하지 못했습니다" |
+
+  유사도는 **의미 유사도(Embedding)** 와 **질문 단어 일치율** 중 높은 쪽을 0~1로 환산한 값이며,
+  기준값은 Settings에서 조정할 수 있습니다.
+- AI 답변이 문서 내용과 맞지 않아 폐기된 경우에도, **찾은 지침 원문은 그대로 보여줍니다.**
+- 로컬 LLM이 실행 중이 아니거나 모델이 없으면 그 사실을 알려주고, 검색된 지침 원문을 보여줍니다.
 
 명령줄에서 검색 결과만 확인하려면:
 ```bat
@@ -229,7 +241,7 @@ Chat 화면에는 `🛡️ 근거 검증: 근거 확인 2/4 문장` 처럼 검�
 
 ```bat
 python cli.py backup                    :: 백업 생성
-python cli.py restore backup\sopbot_backup_20240115_101500.zip   :: 복원
+python cli.py restore backup\guidebot_backup_20240115_101500.zip   :: 복원
 ```
 
 자동 클라우드 백업은 **구현하지 않았습니다.** 백업 파일은 사내 규정에 맞는 위치에 보관하세요.
@@ -259,7 +271,7 @@ python cli.py remove 3        :: ID 3번 문서 삭제
 | 항목 | 구현 |
 |------|------|
 | 외부 AI API | 사용하지 않음 (OpenAI/Anthropic/Gemini/Bedrock/Cohere 등) |
-| 통신 대상 | `127.0.0.1` 로컬 Ollama **뿐**. 그 외 주소는 코드에서 차단(`sopbot/security.py`) |
+| 통신 대상 | `127.0.0.1` 로컬 Ollama **뿐**. 그 외 주소는 코드에서 차단(`guidebot/security.py`) |
 | Telemetry | Streamlit 사용통계·HuggingFace telemetry 등 환경변수로 비활성화 |
 | UI 접근 | `127.0.0.1:8501`만 Binding (`0.0.0.0` 사용 안 함) |
 | 로그 | 시간 / 성공·실패 / 문서 ID / 오류 코드만 기록. 문서 본문·질문 내용은 기록하지 않음 |
@@ -270,6 +282,7 @@ python cli.py remove 3        :: ID 3번 문서 삭제
 python cli.py selfcheck     :: 소스코드에 외부 API·외부 URL·telemetry가 없는지 검사
 python cli.py doctor        :: 실행 환경 + 보안 점검 요약
 python cli.py embed-check   :: Embedding 모델(bge-m3) 분별력 확인
+python cli.py inspect FILE  :: 등록 실패한 문서 진단
 python -m unittest discover -s tests -t .    :: 전체 자동 테스트
 ```
 
@@ -289,7 +302,7 @@ Personal-Project/
 ├─ cli.py               명령줄 도구 (등록·검색·질문·백업·점검)
 ├─ run.bat / run.sh     실행 스크립트
 ├─ requirements.txt     설치 목록 (bge-m3 기준, torch 불필요)
-├─ sopbot/
+├─ guidebot/
 │  ├─ security.py       외부 통신 차단, 소스 점검
 │  ├─ config.py         설정값, 경로, 동의어 사전
 │  ├─ db.py             SQLite Metadata (documents / chunks)
@@ -306,7 +319,7 @@ Personal-Project/
 │  ├─ backup.py         zip 백업·복원
 │  └─ service.py        구성 요소 조립 + 상태 점검
 ├─ sample_docs/         테스트용 예시 SOP + 평가 질문 22개
-├─ tests/               자동 테스트 (76개)
+├─ tests/               자동 테스트 (87개)
 └─ data/                실행 시 자동 생성 (문서·Index·DB·로그)
 ```
 
@@ -320,6 +333,8 @@ Personal-Project/
 | Embedding backend | `auto` / `ollama` / `sentence-transformers` / `hashing` | `auto` (→ Ollama `bge-m3`) |
 | 검색 문서 수 (Top-K) | 답변에 사용할 검색 결과 수 | 5 |
 | 검색 threshold | Vector 유사도 최소값. 높을수록 답변을 더 자주 거부 | 0 (자동: bge-m3 0.50 / e5 0.80) |
+| '찾았습니다'로 답할 유사도 | 이 값 이상이면 바로 답변 | 0.9 |
+| '유사한 내용'으로 안내할 최소 유사도 | 이 값 미만이면 답변하지 않음 | 0.5 |
 | 질문 단어 일치 최소 비율 | 질문 단어가 문서에서 확인된 비율(모델 무관 보조 기준) | 0.3 |
 | 답변 길이 | 짧게 / 보통 / 자세히 | 보통 |
 | 지침문서 전용 모드 | 범위 검사 + 답변 근거 검증 (6-1장) | 켜짐 |
@@ -340,7 +355,10 @@ Personal-Project/
 | `run.bat` 실행 시 `'ho'은(는) 내부 또는 외부 명령...`, `'nstall'은(는)...` 같은 글자 깨짐과 함께 실행 실패 | Windows 콘솔 인코딩 문제입니다. 최신 `run.bat`(순수 영문, CRLF)로 받아 덮어쓰면 해결됩니다. `run.bat`을 메모장으로 열어 저장하지 마세요(BOM이 붙어 다시 깨질 수 있습니다) |
 | 사이드바에 "로컬 LLM 연결 안 됨" | 터미널에서 `ollama serve` 실행 여부, 포트 11434 |
 | "Embedding 모델을 불러오지 못했습니다" | 3장 '모델 준비' 수행, 또는 backend를 `ollama`로 변경 |
-| 답변이 계속 "확인하지 못했습니다" | 문서 등록 여부 확인 → Settings에서 threshold를 낮춤 |
+| 답변이 계속 "확인하지 못했습니다" | ① 사이드바에 **LLM 모델 미설치** 경고가 없는지 확인(`ollama pull qwen2.5:7b-instruct`) ② 문서 등록 여부 확인 ③ Settings에서 "유사한 내용 최소 유사도"를 0.3 정도로 낮춤 |
+| PDF 등록 실패 | `python cli.py inspect "파일경로"` 로 원인 확인(암호 보호 / 텍스트 없음 / 페이지별 추출량) |
+| 이미지·스캔 PDF 등록 실패 | 원본 파일(DOCX/PPTX)을 등록하거나, OCR 처리한 PDF 사본을 등록 |
+| 암호가 걸린 PDF 등록 실패 | 빈 암호는 자동 처리됩니다. 실제 암호가 걸린 파일은 암호를 해제한 사본을 등록 |
 | 맞는 답변인데 문장이 자꾸 제외됨 | Settings → "답변 문장의 문서 일치 최소 비율"을 0.35 정도로 낮춤 |
 | 정상 질문인데 "지침문서 내용만 답변합니다"로 거부됨 | 질문에서 "무시", "아는 대로" 같은 표현을 빼고 다시 질문 |
 | 답변이 느림 | 더 작은 LLM 모델 사용(`qwen2.5:3b-instruct`), Top-K를 3으로 낮춤 |

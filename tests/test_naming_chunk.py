@@ -2,9 +2,9 @@
 
 import unittest
 
-from sopbot.chunk import build_embedding_text, chunk_blocks, detect_heading
-from sopbot.extract import Block
-from sopbot.naming import is_newer_version, parse_doc_name
+from guidebot.chunk import build_embedding_text, chunk_blocks, detect_heading
+from guidebot.extract import Block
+from guidebot.naming import is_newer_version, parse_doc_name
 
 
 class NamingTest(unittest.TestCase):

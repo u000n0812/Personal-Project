@@ -1,6 +1,6 @@
 """SQLite 기반 Metadata 저장소.
 
-별도의 DB 서버를 두지 않고 data/database/sopbot.sqlite3 파일 하나만 사용한다.
+별도의 DB 서버를 두지 않고 data/database/guidebot.sqlite3 파일 하나만 사용한다.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Sequence
 
-from .config import DB_PATH, ensure_dirs
+from .config import DB_PATH, LEGACY_DB_PATH, ensure_dirs
 
 STATUS_ACTIVE = "active"          # 최신 버전, 기본 검색 대상
 STATUS_SUPERSEDED = "superseded"  # 상위 버전이 등록되어 밀려난 문서
@@ -109,7 +109,18 @@ class Database:
         ensure_dirs()
         self.path = Path(path) if path else DB_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._adopt_legacy_database()
         self._init_schema()
+
+    def _adopt_legacy_database(self) -> None:
+        """이전 이름(sopbot.sqlite3)으로 저장된 DB가 있으면 이어서 사용한다.
+
+        프로그램 이름이 GuideBot으로 바뀌어도 이미 등록해 둔 문서가 사라지지 않도록 한다.
+        """
+        if self.path != DB_PATH or self.path.exists():
+            return
+        if LEGACY_DB_PATH.exists():
+            LEGACY_DB_PATH.rename(self.path)
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

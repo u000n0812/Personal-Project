@@ -196,6 +196,8 @@ class DocumentIngestor:
         )
 
         note = "등록 완료"
+        if extracted.warning:
+            note = f"등록 완료 (주의: {extracted.warning})"
         if status == STATUS_SUPERSEDED:
             note = "등록되었지만 더 최신 버전이 있어 과거 버전으로 표시됩니다."
         elif len(self.db.documents_by_key(doc_key)) > 1:

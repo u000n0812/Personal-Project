@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-REM Local guideline-document assistant launcher (Windows)
+REM GuideBot - local guideline-document chatbot launcher (Windows)
 REM Binds only to 127.0.0.1; not reachable from other machines on the network.
 
 cd /d "%~dp0"
@@ -37,7 +37,7 @@ if not exist ".venv" (
     call ".venv\Scripts\activate.bat"
 )
 
-echo [3/3] Open http://127.0.0.1:8501 in your browser.
+echo [3/3] GuideBot is starting. Open http://127.0.0.1:8501 in your browser.
 echo (Press Ctrl+C in this window to stop the server.)
 python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 

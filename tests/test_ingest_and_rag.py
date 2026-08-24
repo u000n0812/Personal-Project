@@ -1,17 +1,23 @@
 """Phase 5~8: 등록/버전관리/삭제, 검색 기반 답변, Hallucination 방지 검증."""
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from sopbot.config import NO_EVIDENCE_ANSWER, WEAK_EVIDENCE_ANSWER, Settings
-from sopbot.db import STATUS_ACTIVE, STATUS_SUPERSEDED, Database
-from sopbot.embed import HashingEmbedder
-from sopbot.ingest import DocumentIngestor
-from sopbot.llm import ChatMessage, LLMError
-from sopbot.rag import RagEngine, build_retrieval_query, format_context, postprocess_answer
-from sopbot.search import Retriever
-from sopbot.vectorstore import VectorStore
+from guidebot.config import (
+    NO_EVIDENCE_ANSWER,
+    UNGROUNDED_ANSWER,
+    WEAK_EVIDENCE_ANSWER,
+    Settings,
+)
+from guidebot.db import STATUS_ACTIVE, STATUS_SUPERSEDED, Database
+from guidebot.embed import HashingEmbedder
+from guidebot.ingest import DocumentIngestor
+from guidebot.llm import ChatMessage, LLMError
+from guidebot.rag import RagEngine, build_retrieval_query, format_context, postprocess_answer
+from guidebot.search import Retriever
+from guidebot.vectorstore import VectorStore
 
 SAMPLE_TEXT = """# External Data Transfer Specification
 
@@ -265,11 +271,14 @@ class StrictModeTest(unittest.TestCase):
         self.assertEqual(len(answer.grounding.unsupported), 2)
 
     def test_fully_ungrounded_answer_is_discarded(self):
+        """모델 문장은 버리되, 검색된 지침 원문은 사용자에게 보여준다."""
         reply = "연차 휴가는 3일 전에 신청하고 팀장 승인을 받으면 됩니다."
         answer = self._engine(FakeClient(reply)).answer("External Data 전달 시 파일 암호화는?")
-        self.assertEqual(answer.answer, NO_EVIDENCE_ANSWER)
         self.assertEqual(answer.evidence, "ungrounded")
-        self.assertEqual(answer.results, [])
+        self.assertNotIn("연차", answer.answer)        # 근거 없는 문장은 표시하지 않는다
+        self.assertIn(UNGROUNDED_ANSWER, answer.answer)
+        self.assertIn("암호화", answer.answer)          # 찾은 원문은 보여준다
+        self.assertTrue(answer.results)
 
     def test_strict_mode_off_keeps_model_answer(self):
         self.settings.strict_mode = False
@@ -280,12 +289,34 @@ class StrictModeTest(unittest.TestCase):
 
     def test_stream_answer_is_also_verified(self):
         engine = self._engine(FakeClient())
-        stream, results, evidence = engine.answer_stream("External Data 전달 시 파일 암호화는?")
+        stream, results, evidence, state = engine.answer_stream("External Data 전달 시 파일 암호화는?")
         collected = "".join(stream) + "\n실제로는 USB로 보내도 된다."
-        final, report = engine.finalize_stream(collected, results)
+        final, report = engine.finalize_stream(collected, results, state)
         self.assertNotIn("USB", final)
         self.assertIn("출처:", final)
         self.assertEqual(len(report.unsupported), 1)
+
+    def test_llm_failure_is_not_reported_as_missing_document(self):
+        """LLM 호출 실패가 '문서에서 확인하지 못했습니다'로 둔갑하면 안 된다."""
+        engine = self._engine(FakeClient(fail=True))
+        stream, results, evidence, state = engine.answer_stream("External Data 전달 시 파일 암호화는?")
+        collected = "".join(stream)
+        final, report = engine.finalize_stream(collected, results, state)
+
+        self.assertTrue(state.error)
+        self.assertTrue(results, "검색은 성공했어야 한다")
+        self.assertNotIn(NO_EVIDENCE_ANSWER, final)
+        self.assertIn("ollama pull", final)      # 원인과 해결 방법 안내
+        self.assertIn("암호화", final)            # 찾은 지침 원문도 함께 표시
+        self.assertIn("출처:", final)
+        self.assertIsNone(report)                # 오류 안내문은 근거 검증 대상이 아니다
+
+    def test_llm_failure_in_non_stream_path(self):
+        answer = self._engine(FakeClient(fail=True)).answer("External Data 전달 시 파일 암호화는?")
+        self.assertEqual(answer.evidence, "llm_error")
+        self.assertNotIn(NO_EVIDENCE_ANSWER, answer.answer)
+        self.assertIn("ollama pull", answer.answer)
+        self.assertTrue(answer.results)
 
 
 class PromptTest(unittest.TestCase):
@@ -324,3 +355,41 @@ class PromptTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LegacyDataTest(unittest.TestCase):
+    """이전 이름(sopbot)으로 저장된 데이터를 GuideBot이 이어받는지 확인."""
+
+    def test_legacy_database_is_adopted(self):
+        import guidebot.config as config
+        from guidebot.db import Database
+
+        with tempfile.TemporaryDirectory() as temp:
+            database_dir = Path(temp)
+            legacy = database_dir / "sopbot.sqlite3"
+            current = database_dir / "guidebot.sqlite3"
+
+            original_db, original_legacy = config.DB_PATH, config.LEGACY_DB_PATH
+            db_module = sys.modules["guidebot.db"]
+            try:
+                config.DB_PATH = current
+                config.LEGACY_DB_PATH = legacy
+                db_module.DB_PATH = current
+                db_module.LEGACY_DB_PATH = legacy
+
+                seeded = Database(legacy)   # 이전 버전에서 만든 DB
+                seeded.insert_document(
+                    doc_key="sop_old", title="예전 문서", file_name="old.txt",
+                    version="1.0", ext=".txt", file_hash="hash-old",
+                    source_path="/x", stored_path="/y",
+                )
+                self.assertTrue(legacy.exists())
+
+                adopted = Database()        # 이름이 바뀐 뒤 첫 실행
+                self.assertTrue(current.exists())
+                self.assertFalse(legacy.exists())
+                self.assertEqual(len(adopted.list_documents()), 1)
+                self.assertEqual(adopted.list_documents()[0].title, "예전 문서")
+            finally:
+                config.DB_PATH, config.LEGACY_DB_PATH = original_db, original_legacy
+                db_module.DB_PATH, db_module.LEGACY_DB_PATH = original_db, original_legacy

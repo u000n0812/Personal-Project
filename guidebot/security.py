@@ -1,6 +1,6 @@
 """외부 통신 차단 및 오프라인 동작을 보장하기 위한 보안 모듈.
 
-이 패키지의 다른 모듈보다 먼저 import 되어야 한다(`sopbot/__init__.py`에서 처리).
+이 패키지의 다른 모듈보다 먼저 import 되어야 한다(`guidebot/__init__.py`에서 처리).
 - 서드파티 라이브러리의 telemetry / 자동 다운로드를 환경변수로 끈다.
 - 네트워크 접속 대상이 loopback(127.0.0.1)인지 검사하는 헬퍼를 제공한다.
 - 소스코드에 외부 API 호출이 없는지 검사하는 self-check 기능을 제공한다.
@@ -37,7 +37,7 @@ _OFFLINE_ENV = {
 }
 
 # 모델을 처음 내려받아야 하는 상황(최초 1회 준비 단계)에서만 1로 설정한다.
-ALLOW_MODEL_DOWNLOAD_ENV = "SOPBOT_ALLOW_MODEL_DOWNLOAD"
+ALLOW_MODEL_DOWNLOAD_ENV = "GUIDEBOT_ALLOW_MODEL_DOWNLOAD"
 
 
 def apply_offline_env() -> None:
@@ -132,7 +132,7 @@ def scan_source_tree(root: Path | str) -> list[str]:
         if any(part in skip_dirs for part in path.parts):
             continue
         rel = path.relative_to(root)
-        if rel.as_posix() == "sopbot/security.py":
+        if rel.as_posix() == "guidebot/security.py":
             # 이 파일은 금지 패턴 목록 자체를 담고 있으므로 검사 대상에서 제외한다.
             continue
         try:

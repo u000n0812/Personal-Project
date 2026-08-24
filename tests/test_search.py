@@ -4,12 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sopbot.config import DEFAULT_SYNONYMS, Settings
-from sopbot.db import Database
-from sopbot.embed import HashingEmbedder
-from sopbot.search import Retriever
-from sopbot.keyword import KeywordIndex, coverage, expand_query, tokenize
-from sopbot.vectorstore import VectorStore
+from guidebot.config import DEFAULT_SYNONYMS, Settings
+from guidebot.db import Database
+from guidebot.embed import HashingEmbedder
+from guidebot.search import Retriever
+from guidebot.keyword import KeywordIndex, coverage, expand_query, tokenize
+from guidebot.vectorstore import VectorStore
 
 
 class TokenizerTest(unittest.TestCase):
@@ -117,3 +117,40 @@ class ThresholdTest(unittest.TestCase):
     def test_explicit_threshold_wins(self):
         retriever = self._retriever(Settings(score_threshold=0.62))
         self.assertAlmostEqual(retriever.effective_threshold, 0.62)
+
+
+class ConfidenceTierTest(unittest.TestCase):
+    """유사도 등급(찾음 / 유사 / 근거부족) 판정 검증."""
+
+    def _retriever(self, **overrides) -> Retriever:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        options = {"score_threshold": 0.5, "min_keyword_coverage": 0.3, **overrides}
+        settings = Settings(**options)
+        return Retriever(
+            Database(root / "t.sqlite3"),
+            VectorStore(root / "index"),
+            HashingEmbedder(64),
+            settings,
+        )
+
+    def test_confidence_scales_with_vector_score(self):
+        retriever = self._retriever()
+        # threshold 0.5 기준: low=0.30, high=0.65 구간으로 환산된다.
+        self.assertEqual(retriever.confidence_of(0.30, 0.0), 0.0)
+        self.assertGreaterEqual(retriever.confidence_of(0.65, 0.0), 1.0)
+        self.assertGreater(retriever.confidence_of(0.62, 0.0), 0.9)
+        self.assertLess(retriever.confidence_of(0.45, 0.0), 0.5)
+
+    def test_word_match_alone_can_carry_confidence(self):
+        """Embedding 점수가 낮아도 질문 단어가 그대로 있으면 근거로 인정한다."""
+        retriever = self._retriever()
+        self.assertGreaterEqual(retriever.confidence_of(0.0, 0.6), 1.0)
+        self.assertAlmostEqual(retriever.confidence_of(0.0, 0.3), 0.5, places=2)
+
+    def test_threshold_change_moves_confidence_scale(self):
+        """모델 threshold가 바뀌면 같은 cosine이라도 신뢰도가 달라진다."""
+        loose = self._retriever(score_threshold=0.3)
+        strict = self._retriever(score_threshold=0.8)
+        self.assertGreater(loose.confidence_of(0.5, 0.0), strict.confidence_of(0.5, 0.0))

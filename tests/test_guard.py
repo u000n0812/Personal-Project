@@ -2,7 +2,7 @@
 
 import unittest
 
-from sopbot.guard import apply_grounding, check_scope, split_sentences, verify_answer
+from guidebot.guard import apply_grounding, check_scope, split_sentences, verify_answer
 
 CONTEXT = [
     "Data Provider는 전달 파일을 반드시 암호화한다. 암호화는 AES-256 방식을 사용한다. "

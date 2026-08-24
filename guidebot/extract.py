@@ -14,6 +14,9 @@ from .structure import split_lines_by_heading
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".xlsx", ".pptx"}
 
+# 이보다 적게 추출되면 텍스트가 없는 문서로 판단한다(문서 전체 기준)
+MIN_PDF_CHARS = 30
+
 
 class ExtractionError(RuntimeError):
     """문서에서 텍스트를 추출하지 못했을 때 발생한다."""
@@ -38,6 +41,7 @@ class ExtractedDocument:
     blocks: list[Block]
     page_count: int
     title: str = ""
+    warning: str = ""   # 등록은 되지만 사용자에게 알려야 하는 사항(예: 텍스트가 적음)
 
     @property
     def text(self) -> str:
@@ -93,14 +97,33 @@ def extract_pdf(path: Path) -> ExtractedDocument:
     try:
         reader = pypdf.PdfReader(str(path))
     except Exception as exc:  # pypdf는 다양한 예외를 던진다
-        raise ExtractionError(f"PDF를 열 수 없습니다: {exc.__class__.__name__}") from exc
+        raise ExtractionError(
+            f"PDF 파일을 열 수 없습니다({exc.__class__.__name__}). "
+            "파일이 손상되었는지 확인하세요."
+        ) from exc
+
+    # 암호가 걸린 PDF: 사내 문서는 빈 암호로 보호된 경우가 많으므로 먼저 시도한다.
+    if getattr(reader, "is_encrypted", False):
+        try:
+            if not reader.decrypt(""):
+                raise ExtractionError(
+                    "암호로 보호된 PDF입니다. 암호를 해제한 사본을 등록해 주세요."
+                )
+        except ExtractionError:
+            raise
+        except Exception as exc:
+            raise ExtractionError(
+                "암호로 보호된 PDF라 내용을 읽을 수 없습니다. 암호를 해제한 사본을 등록해 주세요."
+            ) from exc
 
     blocks: list[Block] = []
+    failed_pages = 0
     for page_no, page in enumerate(reader.pages, start=1):
         try:
             text = page.extract_text() or ""
         except Exception:
             text = ""
+            failed_pages += 1
         for paragraph in _split_paragraphs(text):
             # PDF에는 서식 정보가 없으므로 줄 단위로 제목을 추정한다.
             for piece, is_heading, level in split_lines_by_heading(paragraph):
@@ -115,11 +138,26 @@ def extract_pdf(path: Path) -> ExtractedDocument:
 
     page_count = len(reader.pages)
     total_chars = sum(len(b.text) for b in blocks)
-    if page_count and total_chars < 20 * page_count:
+
+    # 추출된 글자가 사실상 없을 때만 거부한다(이미지로만 이루어진 문서).
+    if total_chars < MIN_PDF_CHARS:
         raise ExtractionError(
-            "텍스트가 거의 없는 PDF입니다(이미지 스캔 문서로 보입니다). "
-            "초기 버전은 OCR을 지원하지 않습니다."
+            f"이 PDF에서는 텍스트를 찾지 못했습니다(추출 {total_chars}자 / {page_count}쪽). "
+            "이미지·스캔으로만 이루어진 문서로 보입니다. "
+            "원본 파일(DOCX/PPTX)이 있으면 그것을 등록하거나, "
+            "PDF에서 텍스트 인식(OCR)을 적용한 사본을 등록해 주세요."
         )
+
+    # 글자 수가 적더라도 등록은 진행하되 사용자에게 알린다(그림 위주 안내문 등).
+    warning = ""
+    if page_count and total_chars < 20 * page_count:
+        warning = (
+            f"텍스트가 적게 추출되었습니다({total_chars}자 / {page_count}쪽). "
+            "그림 위주 문서일 수 있어 검색 품질이 낮을 수 있습니다."
+        )
+    if failed_pages:
+        warning = (warning + " " if warning else "") + f"읽지 못한 페이지 {failed_pages}쪽 있음."
+
     title = ""
     try:
         meta = reader.metadata
@@ -127,7 +165,9 @@ def extract_pdf(path: Path) -> ExtractedDocument:
             title = str(meta.title).strip()
     except Exception:
         title = ""
-    return ExtractedDocument(blocks=blocks, page_count=page_count, title=title)
+    return ExtractedDocument(
+        blocks=blocks, page_count=page_count, title=title, warning=warning
+    )
 
 
 def extract_docx(path: Path) -> ExtractedDocument:

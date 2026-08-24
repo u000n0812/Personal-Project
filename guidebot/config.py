@@ -13,16 +13,26 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # 테스트나 다중 프로필 실행을 위해 데이터 폴더를 환경변수로 바꿀 수 있다.
-DATA_DIR = Path(os.environ.get("SOPBOT_DATA_DIR", PROJECT_ROOT / "data")).resolve()
+# 이전 이름(SOPBOT_*)으로 설정해 둔 환경도 그대로 동작하게 한다.
+DATA_DIR = Path(
+    os.environ.get("GUIDEBOT_DATA_DIR")
+    or os.environ.get("SOPBOT_DATA_DIR")
+    or PROJECT_ROOT / "data"
+).resolve()
 
 DOCUMENTS_DIR = DATA_DIR / "documents"   # 원본 문서 사본
 INDEX_DIR = DATA_DIR / "index"           # Vector Index
 DATABASE_DIR = DATA_DIR / "database"     # SQLite
 LOGS_DIR = DATA_DIR / "logs"             # 운영 로그(민감정보 미기록)
 CACHE_DIR = DATA_DIR / "cache"           # 로컬 모델 캐시
-BACKUP_DIR = Path(os.environ.get("SOPBOT_BACKUP_DIR", PROJECT_ROOT / "backup")).resolve()
+BACKUP_DIR = Path(
+    os.environ.get("GUIDEBOT_BACKUP_DIR")
+    or os.environ.get("SOPBOT_BACKUP_DIR")
+    or PROJECT_ROOT / "backup"
+).resolve()
 
-DB_PATH = DATABASE_DIR / "sopbot.sqlite3"
+DB_PATH = DATABASE_DIR / "guidebot.sqlite3"
+LEGACY_DB_PATH = DATABASE_DIR / "sopbot.sqlite3"   # 이전 버전에서 만든 DB
 CONFIG_PATH = DATA_DIR / "config.json"
 SYNONYM_PATH = DATA_DIR / "synonyms.json"
 
@@ -30,6 +40,11 @@ SYNONYM_PATH = DATA_DIR / "synonyms.json"
 NO_EVIDENCE_ANSWER = "등록된 지침문서에서는 해당 내용을 확인하지 못했습니다."
 WEAK_EVIDENCE_ANSWER = (
     "관련 내용으로 다음 문서가 검색되었지만 질문에 대한 명확한 절차는 확인되지 않습니다."
+)
+# 검색은 성공했지만 모델 답변이 문서 내용과 맞지 않아 폐기한 경우
+UNGROUNDED_ANSWER = (
+    "AI가 만든 답변이 지침문서 내용과 맞지 않아 표시하지 않았습니다. "
+    "아래에 검색된 지침문서 원문을 그대로 보여드리니 직접 확인해 주세요."
 )
 
 
@@ -55,6 +70,8 @@ class Settings:
     score_threshold: float = 0.0        # 0이면 Embedding 모델별 권장값을 자동 사용
     keyword_weight: float = 0.4
     min_keyword_coverage: float = 0.3   # 질문 단어가 문서에서 확인된 비율의 최소값
+    high_confidence: float = 0.9        # 이 이상이면 "해당 내용을 찾았습니다"
+    medium_confidence: float = 0.5      # 이 이상이면 "유사한 내용을 찾았습니다(확인 필요)"
     min_score_ratio: float = 0.3        # 1위 대비 이 비율 미만인 결과는 출처에서 제외
     include_superseded: bool = False
 
