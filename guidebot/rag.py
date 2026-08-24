@@ -199,6 +199,38 @@ def build_messages(
     return messages
 
 
+# Ollama 응답 사이 모델을 메모리에 계속 올려둔다. 기본값(보통 5분)보다 길게
+# 잡아, 질문 사이에 잠깐 텀이 있어도 매번 모델을 디스크에서 다시 불러오는
+# 지연(적게는 수 초, 크게는 수십 초)이 생기지 않도록 한다.
+KEEP_ALIVE = "30m"
+
+# 문자 1개당 예상 토큰 수. 한글은 영어보다 토큰화 효율이 낮아 넉넉히 잡는다
+# (실측치가 아니라 안전 마진이 큰 상한 추정치 - 과소평가해서 문맥이 잘리는
+# 것보다 약간 크게 잡아 항상 들어맞게 하는 쪽이 안전하다).
+_CHARS_PER_TOKEN_ESTIMATE = 0.7
+
+_NUM_CTX_MIN = 2048
+_NUM_CTX_MAX = 32768
+_NUM_CTX_ROUND_TO = 512  # 이 단위로 올림해 필요 이상으로 크게 잡지 않는다
+
+
+def estimate_num_ctx(settings: Settings) -> int:
+    """이 프로그램이 실제로 사용하는 만큼만 담을 수 있는 num_ctx를 고른다.
+
+    Ollama에 num_ctx를 지정하지 않으면 모델(또는 Ollama)의 기본값을 쓰는데,
+    이는 대개 우리가 실제로 쓰는 프롬프트 길이보다 훨씬 커서 불필요하게
+    느리다. 시스템 프롬프트 + 최근 대화 + 검색된 문서 + 생성 답변을 모두
+    더해 필요한 만큼만(512 단위로 올림) 잡으면, 답이 잘리지 않으면서도
+    매 요청마다 더 작은 context로 계산해 더 빨라진다.
+    """
+    history_chars = settings.history_turns * 2 * 500  # build_messages가 메시지당 500자로 자름
+    estimated_chars = len(SYSTEM_PROMPT) + history_chars + settings.max_context_chars
+    estimated_tokens = int(estimated_chars * _CHARS_PER_TOKEN_ESTIMATE) + settings.llm_num_predict
+    estimated_tokens = int(estimated_tokens * 1.2) + 256  # 여유 마진
+    rounded = ((estimated_tokens + _NUM_CTX_ROUND_TO - 1) // _NUM_CTX_ROUND_TO) * _NUM_CTX_ROUND_TO
+    return max(_NUM_CTX_MIN, min(rounded, _NUM_CTX_MAX))
+
+
 class RagEngine:
     """검색 + 로컬 LLM 답변을 묶은 엔진."""
 
@@ -264,6 +296,9 @@ class RagEngine:
                 messages,
                 model=self.settings.llm_model,
                 temperature=self.settings.temperature,
+                num_predict=self.settings.llm_num_predict,
+                num_ctx=estimate_num_ctx(self.settings),
+                keep_alive=KEEP_ALIVE,
             )
         except LLMError as exc:
             logger.error("llm call failed: %s", exc.__class__.__name__)
@@ -397,6 +432,9 @@ class RagEngine:
                     messages,
                     model=self.settings.llm_model,
                     temperature=self.settings.temperature,
+                    num_predict=self.settings.llm_num_predict,
+                    num_ctx=estimate_num_ctx(self.settings),
+                    keep_alive=KEEP_ALIVE,
                 ):
                     yield piece
             except LLMError as exc:

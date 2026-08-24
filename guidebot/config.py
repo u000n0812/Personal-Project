@@ -111,6 +111,16 @@ class Settings:
     def answer_max_sentences(self) -> int:
         return {"짧게": 4, "보통": 8, "자세히": 16}.get(self.answer_length, 8)
 
+    @property
+    def llm_num_predict(self) -> int:
+        """답변 길이 설정에 맞춰 LLM이 생성할 최대 토큰 수를 정한다.
+
+        이 값이 없으면 Ollama가 자체 기본 상한(모델마다 다르며 보통 매우 큼)
+        까지 계속 생성을 시도할 수 있어 불필요하게 느려진다. 문장 수 기준과
+        비슷한 체감이 되도록 문장당 넉넉히 40토큰을 잡고 여유분을 더한다.
+        """
+        return self.answer_max_sentences * 40 + 60
+
 
 def ensure_dirs() -> None:
     """최초 실행 시 필요한 폴더를 자동 생성한다."""

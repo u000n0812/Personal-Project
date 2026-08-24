@@ -52,14 +52,14 @@ class FakeClient:
         self.fail = fail
         self.calls: list[list[ChatMessage]] = []
 
-    def chat(self, messages, model, temperature=0.1, num_predict=None):
+    def chat(self, messages, model, temperature=0.1, num_predict=None, num_ctx=None, keep_alive=None):
         self.calls.append(list(messages))
         if self.fail:
             raise LLMError("연결 실패")
         return self.reply
 
-    def chat_stream(self, messages, model, temperature=0.1, num_predict=None):
-        yield self.chat(messages, model, temperature, num_predict)
+    def chat_stream(self, messages, model, temperature=0.1, num_predict=None, num_ctx=None, keep_alive=None):
+        yield self.chat(messages, model, temperature, num_predict, num_ctx, keep_alive)
 
     def is_available(self):
         return not self.fail
@@ -373,6 +373,51 @@ class StrictModeTest(unittest.TestCase):
         self.assertNotIn(NO_EVIDENCE_ANSWER, answer.answer)
         self.assertIn("ollama pull", answer.answer)
         self.assertTrue(answer.results)
+
+
+class SpeedSettingsTest(unittest.TestCase):
+    """답변 속도를 좌우하는 num_predict/num_ctx 산정 로직을 검증한다."""
+
+    def test_num_predict_scales_with_answer_length(self):
+        short = Settings(answer_length="짧게").llm_num_predict
+        medium = Settings(answer_length="보통").llm_num_predict
+        long_ = Settings(answer_length="자세히").llm_num_predict
+        self.assertLess(short, medium)
+        self.assertLess(medium, long_)
+        self.assertGreater(short, 0)
+
+    def test_num_ctx_covers_worst_case_prompt(self):
+        """추정값이 실제 프롬프트보다 작으면 문맥이 잘려 답변 품질이 떨어진다."""
+        from guidebot.rag import SYSTEM_PROMPT, _CHARS_PER_TOKEN_ESTIMATE, estimate_num_ctx
+
+        settings = Settings(history_turns=3, max_context_chars=6000, answer_length="자세히")
+        num_ctx = estimate_num_ctx(settings)
+
+        history_chars = settings.history_turns * 2 * 500
+        worst_case_chars = len(SYSTEM_PROMPT) + history_chars + settings.max_context_chars
+        worst_case_tokens = worst_case_chars * _CHARS_PER_TOKEN_ESTIMATE + settings.llm_num_predict
+        self.assertGreater(num_ctx, worst_case_tokens)
+
+    def test_num_ctx_shrinks_for_smaller_settings(self):
+        from guidebot.rag import estimate_num_ctx
+
+        small = estimate_num_ctx(
+            Settings(history_turns=1, max_context_chars=2000, answer_length="짧게", top_k=3)
+        )
+        large = estimate_num_ctx(
+            Settings(history_turns=5, max_context_chars=10000, answer_length="자세히", top_k=10)
+        )
+        self.assertLess(small, large)
+
+    def test_num_ctx_stays_within_bounds(self):
+        from guidebot.rag import _NUM_CTX_MAX, _NUM_CTX_MIN, estimate_num_ctx
+
+        tiny = estimate_num_ctx(Settings(history_turns=0, max_context_chars=100, answer_length="짧게"))
+        huge = estimate_num_ctx(
+            Settings(history_turns=10, max_context_chars=50000, answer_length="자세히")
+        )
+        self.assertGreaterEqual(tiny, _NUM_CTX_MIN)
+        self.assertLessEqual(huge, _NUM_CTX_MAX)
 
 
 class PromptTest(unittest.TestCase):

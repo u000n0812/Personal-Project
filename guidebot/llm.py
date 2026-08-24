@@ -113,6 +113,8 @@ class OllamaClient:
         model: str,
         temperature: float = 0.1,
         num_predict: int | None = None,
+        num_ctx: int | None = None,
+        keep_alive: str | None = None,
     ) -> str:
         """대화형 호출. 전체 답변 문자열을 반환한다."""
         payload = {
@@ -123,6 +125,10 @@ class OllamaClient:
         }
         if num_predict:
             payload["options"]["num_predict"] = num_predict
+        if num_ctx:
+            payload["options"]["num_ctx"] = num_ctx
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
         with self._request("/api/chat", payload) as response:
             body = json.loads(response.read().decode("utf-8"))
         if "error" in body:
@@ -138,6 +144,8 @@ class OllamaClient:
         model: str,
         temperature: float = 0.1,
         num_predict: int | None = None,
+        num_ctx: int | None = None,
+        keep_alive: str | None = None,
     ) -> Iterator[str]:
         """토큰 단위로 답변을 흘려보낸다(UI 응답성 향상)."""
         payload = {
@@ -148,6 +156,10 @@ class OllamaClient:
         }
         if num_predict:
             payload["options"]["num_predict"] = num_predict
+        if num_ctx:
+            payload["options"]["num_ctx"] = num_ctx
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
         with self._request("/api/chat", payload) as response:
             for raw_line in response:
                 line = raw_line.decode("utf-8").strip()

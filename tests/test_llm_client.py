@@ -126,6 +126,32 @@ class LlmClientTest(unittest.TestCase):
         self.assertEqual(sent["body"]["messages"][0]["role"], "system")
         self.assertEqual(sent["body"]["options"]["temperature"], 0.1)
 
+    def test_chat_sends_speed_options_when_provided(self):
+        """num_predict/num_ctx/keep_alive가 실제 요청에 실려가는지 확인한다.
+
+        이 값들이 빠지면 Ollama가 모델 기본 상한(대개 우리가 쓰는 것보다
+        훨씬 큼)을 그대로 써서 불필요하게 느려진다.
+        """
+        self.client.chat(
+            [ChatMessage("user", "질문")],
+            model="qwen2.5:7b-instruct",
+            num_predict=380,
+            num_ctx=9216,
+            keep_alive="30m",
+        )
+        sent_body = RECEIVED[0]["body"]
+        self.assertEqual(sent_body["options"]["num_predict"], 380)
+        self.assertEqual(sent_body["options"]["num_ctx"], 9216)
+        self.assertEqual(sent_body["keep_alive"], "30m")
+
+    def test_chat_omits_speed_options_when_not_given(self):
+        """값을 안 넘기면 Ollama 기본값을 그대로 쓰도록 payload에서 빠져야 한다."""
+        self.client.chat([ChatMessage("user", "질문")], model="qwen2.5:7b-instruct")
+        sent_body = RECEIVED[0]["body"]
+        self.assertNotIn("num_predict", sent_body["options"])
+        self.assertNotIn("num_ctx", sent_body["options"])
+        self.assertNotIn("keep_alive", sent_body)
+
     def test_chat_stream_yields_pieces(self):
         pieces = list(
             self.client.chat_stream([ChatMessage("user", "질문")], model="qwen2.5:7b-instruct")
