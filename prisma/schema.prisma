@@ -18,11 +18,14 @@ model Entry {
   type      EntryType
 
   // dream fields
-  dreamText String?
-  mood      String?
-  symbols   Json?
-  advice    String?
-  title     String?
+  dreamText     String?
+  mood          String?
+  symbols       Json?
+  advice        String?
+  title         String?
+  traditional   String?
+  psychological String?
+  fortune       Json?
 
   // tarot fields
   cardName    String?

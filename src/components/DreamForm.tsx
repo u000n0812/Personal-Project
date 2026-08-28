@@ -3,14 +3,49 @@
 import { useState } from "react";
 
 type DreamSymbol = { name: string; meaning: string };
+type DreamFortune = {
+  wealth: string;
+  relationship: string;
+  love: string;
+  health: string;
+  omen: string;
+};
 type DreamResult = {
   title: string;
   mood: string;
+  traditional: string;
+  psychological: string;
   symbols: DreamSymbol[];
+  fortune: DreamFortune;
   advice: string;
 };
 
-const MOOD_OPTIONS = ["😨 불안", "🏃 쫓김", "😢 슬픔", "😊 설렘", "😵 혼란", "🕊️ 평온"];
+/**
+ * 플루칙(Plutchik)의 8가지 기본 감정을 뼈대로, 꿈에서 특히 자주 나타나는
+ * 불안·혼란·평온을 더한 11개. 이 조합이면 대부분의 꿈 감정이 이 안에 들어온다.
+ */
+const MOOD_OPTIONS = [
+  "😊 기쁨",
+  "💓 설렘",
+  "🥰 애정",
+  "🕊️ 평온",
+  "😢 슬픔",
+  "😠 분노",
+  "😨 두려움",
+  "😰 불안",
+  "😲 놀람",
+  "🤢 혐오",
+  "😵‍💫 혼란",
+];
+
+const FORTUNE_FIELDS: { key: keyof DreamFortune; label: string; icon: string }[] = [
+  { key: "wealth", label: "재물", icon: "💰" },
+  { key: "relationship", label: "인간관계", icon: "🤝" },
+  { key: "love", label: "연애·결혼", icon: "💞" },
+  { key: "health", label: "건강", icon: "🌿" },
+  { key: "omen", label: "사건 징조", icon: "🔮" },
+];
+
 const MAX_LENGTH = 1000;
 
 export default function DreamForm() {
@@ -113,8 +148,25 @@ export default function DreamForm() {
             <span className="h-1.5 w-1.5 rounded-full bg-gold" />
             {result.mood}
           </span>
-          <h2 className="mb-4 font-serif text-lg font-bold text-ink">{result.title}</h2>
+          <h2 className="mb-5 font-serif text-lg font-bold text-ink">{result.title}</h2>
 
+          <div className="flex flex-col gap-3">
+            <section className="rounded-xl border border-gold/25 bg-gold/[0.07] p-4">
+              <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-gold">
+                <span>📜</span> 전통 해몽
+              </h3>
+              <p className="text-sm leading-relaxed text-ink-dim">{result.traditional}</p>
+            </section>
+
+            <section className="rounded-xl border border-accent/25 bg-accent/[0.07] p-4">
+              <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-accent">
+                <span>🧠</span> 심리학 관점
+              </h3>
+              <p className="text-sm leading-relaxed text-ink-dim">{result.psychological}</p>
+            </section>
+          </div>
+
+          <h3 className="mt-6 mb-2 text-sm font-bold text-ink">꿈속 상징</h3>
           <div className="flex flex-col divide-y divide-white/10">
             {result.symbols.map((symbol) => (
               <div key={symbol.name} className="flex justify-between gap-4 py-2.5 text-sm">
@@ -124,7 +176,21 @@ export default function DreamForm() {
             ))}
           </div>
 
-          <div className="mt-4 rounded-xl bg-white/5 p-3.5 text-sm leading-relaxed text-ink-dim">
+          <h3 className="mt-6 mb-2 text-sm font-bold text-ink">이 꿈이 말해주는 것</h3>
+          <div className="flex flex-col gap-2">
+            {FORTUNE_FIELDS.map((field) => (
+              <div key={field.key} className="rounded-xl bg-white/5 p-3.5">
+                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-ink">
+                  <span>{field.icon}</span> {field.label}
+                </p>
+                <p className="text-sm leading-relaxed text-ink-dim">
+                  {result.fortune[field.key]}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.07] p-3.5 text-sm leading-relaxed text-ink-dim">
             <b className="text-ink">오늘의 조언</b>
             <br />
             {result.advice}

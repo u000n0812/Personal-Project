@@ -34,10 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <BrandBar />
-        <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-8">{children}</main>
-        <footer className="mx-auto w-full max-w-2xl px-5 pb-28 text-xs text-ink-faint">
-          몽블랑은 참고용 콘텐츠이며, 중요한 결정은 스스로의 판단을 따라주세요.
-        </footer>
+        <main className="mx-auto w-full max-w-2xl flex-1 px-5 pt-8 pb-28">{children}</main>
         <TabBar />
       </body>
     </html>

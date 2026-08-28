@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
         mood: interpretation.mood,
         symbols: interpretation.symbols,
         advice: interpretation.advice,
+        traditional: interpretation.traditional,
+        psychological: interpretation.psychological,
+        fortune: interpretation.fortune,
       },
     });
     return NextResponse.json({ entry });

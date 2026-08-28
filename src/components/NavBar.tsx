@@ -12,13 +12,10 @@ const LINKS = [
 export function BrandBar() {
   return (
     <header className="sticky top-0 z-10 border-b border-line/70 bg-bg/80 backdrop-blur">
-      <div className="mx-auto flex max-w-2xl items-baseline gap-2 px-5 py-4">
+      <div className="mx-auto flex max-w-2xl items-baseline px-5 py-4">
         <Link href="/" className="font-serif text-lg font-bold tracking-tight text-ink">
           몽블랑
         </Link>
-        <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint">
-          MONGBLANC
-        </span>
       </div>
     </header>
   );
