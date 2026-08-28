@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TarotCardImage from "@/components/TarotCardImage";
 
 type TarotResult = {
   cardName: string;
@@ -42,7 +43,7 @@ export default function TarotDraw() {
 
   if (loading) {
     return (
-      <div className="flex aspect-[5/7] max-w-xs animate-pulse items-center justify-center rounded-2xl border border-line bg-surface text-sm text-ink-faint">
+      <div className="mx-auto flex aspect-[600/1054] w-full max-w-[260px] animate-pulse items-center justify-center rounded-2xl border border-line bg-surface text-sm text-ink-faint">
         불러오는 중...
       </div>
     );
@@ -54,7 +55,7 @@ export default function TarotDraw() {
         <button
           onClick={draw}
           disabled={drawing}
-          className="group relative flex aspect-[5/7] w-full max-w-xs flex-col items-center justify-center gap-3 rounded-2xl border border-gold/40 bg-[radial-gradient(circle_at_50%_30%,rgba(224,183,104,0.18),transparent_55%),linear-gradient(155deg,#2c2258,#150f2c_70%)] transition-transform hover:scale-[1.02] disabled:opacity-60"
+          className="group relative flex aspect-[600/1054] w-full max-w-[260px] flex-col items-center justify-center gap-3 rounded-2xl border border-gold/40 bg-[radial-gradient(circle_at_50%_30%,rgba(224,183,104,0.18),transparent_55%),linear-gradient(155deg,#2c2258,#150f2c_70%)] transition-transform hover:scale-[1.02] disabled:opacity-60"
         >
           <span className="text-3xl">✦</span>
           <span className="font-serif text-lg font-bold text-ink">
@@ -75,13 +76,11 @@ export default function TarotDraw() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="mx-auto flex aspect-[5/7] w-full max-w-xs flex-col items-center justify-center gap-2 rounded-2xl border border-gold/40 bg-[radial-gradient(circle_at_50%_30%,rgba(224,183,104,0.28),transparent_55%),linear-gradient(155deg,#2c2258,#150f2c_70%)]">
-        <span className="text-3xl text-gold">✦</span>
-        <p className="font-serif text-lg font-bold text-ink">{result.cardName}</p>
-        <p className="font-mono text-[11px] text-ink-dim">
-          {result.cardKeyword} · {result.reversed ? "역방향" : "정방향"}
-        </p>
-      </div>
+      <TarotCardImage
+        cardName={result.cardName}
+        cardKeyword={result.cardKeyword}
+        reversed={result.reversed}
+      />
 
       <div className="rounded-2xl border border-line bg-surface p-5">
         <b className="mb-1.5 block text-sm text-ink">오늘의 한마디</b>

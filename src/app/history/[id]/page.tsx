@@ -7,6 +7,7 @@ import DreamReading, {
   type DreamFortune,
   type DreamSymbol,
 } from "@/components/DreamReading";
+import TarotCardImage from "@/components/TarotCardImage";
 
 export const dynamic = "force-dynamic";
 
@@ -63,13 +64,11 @@ export default async function HistoryDetailPage({
         </>
       ) : (
         <>
-          <div className="mx-auto flex aspect-[5/7] w-full max-w-xs flex-col items-center justify-center gap-2 rounded-2xl border border-gold/40 bg-[radial-gradient(circle_at_50%_30%,rgba(224,183,104,0.28),transparent_55%),linear-gradient(155deg,#2c2258,#150f2c_70%)]">
-            <span className="text-3xl text-gold">✦</span>
-            <p className="font-serif text-lg font-bold text-ink">{entry.cardName}</p>
-            <p className="font-mono text-[11px] text-ink-dim">
-              {entry.cardKeyword} · {entry.reversed ? "역방향" : "정방향"}
-            </p>
-          </div>
+          <TarotCardImage
+            cardName={entry.cardName}
+            cardKeyword={entry.cardKeyword}
+            reversed={entry.reversed}
+          />
 
           <div className="rounded-2xl border border-line bg-surface p-5">
             <b className="mb-1.5 block text-sm text-ink">그날의 한마디</b>

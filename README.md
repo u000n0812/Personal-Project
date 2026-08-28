@@ -56,6 +56,14 @@ API 키를 입력하는 화면이 나와요. DB 테이블은 첫 배포 때 자�
 
 숫자를 바꾸고 싶으면 각 파일 위쪽의 `DAILY_LIMIT` 상수를 고치면 돼요.
 
+## 카드 그림 출처
+
+`public/tarot`의 78장은 라이더-웨이트-스미스 덱(1909, Pamela Colman Smith 그림)입니다.
+저작권이 만료되어 퍼블릭 도메인으로 통용되는 판본이며, npm 패키지
+[`@cometpisces/tarot-kit-images`](https://www.npmjs.com/package/@cometpisces/tarot-kit-images)에서
+받아 WebP로 변환해 담았습니다. 다만 배포처의 안내대로 국가별 저작권 해석이 다를 수 있으니,
+상업적으로 크게 쓸 계획이라면 해당 지역 기준을 한 번 확인해주세요.
+
 ## 기술 스택
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
