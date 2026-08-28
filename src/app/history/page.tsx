@@ -17,7 +17,7 @@ export default async function HistoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-accent">
+        <p className="mb-2 font-mono text-xs tracking-[0.04em] text-accent">
           히스토리
         </p>
         <h1 className="font-serif text-2xl font-bold text-ink text-balance">
@@ -66,7 +66,7 @@ export default async function HistoryPage() {
       )}
 
       <p className="flex items-center gap-1.5 self-start font-mono text-[10.5px] text-ink-faint">
-        <span className="text-gold">⛁</span> Vercel Postgres에서 불러옴
+        <span className="text-gold">⛁</span> 이 기기의 기록을 데이터베이스에서 불러왔어요
       </p>
     </div>
   );

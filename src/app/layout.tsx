@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Serif_KR, Noto_Sans_KR, JetBrains_Mono } from "next/font/google";
-import NavBar from "@/components/NavBar";
+import { BrandBar, TabBar } from "@/components/NavBar";
 import "./globals.css";
 
 const notoSerifKr = Noto_Serif_KR({
@@ -33,11 +33,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${notoSerifKr.variable} ${notoSansKr.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NavBar />
-        <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-10">{children}</main>
-        <footer className="mx-auto w-full max-w-2xl px-5 pb-10 text-xs text-ink-faint">
+        <BrandBar />
+        <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-8">{children}</main>
+        <footer className="mx-auto w-full max-w-2xl px-5 pb-28 text-xs text-ink-faint">
           몽블랑은 참고용 콘텐츠이며, 중요한 결정은 스스로의 판단을 따라주세요.
         </footer>
+        <TabBar />
       </body>
     </html>
   );

@@ -1,20 +1,36 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import type { TarotCard } from "@/data/tarot";
 
-const MODEL_NAME = "gemini-2.0-flash";
+const MODEL_NAME = "gemini-3.6-flash";
 
-function getModel() {
+function getClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
       "GEMINI_API_KEY가 설정되어 있지 않아요. .env.local에 Google AI Studio에서 발급한 키를 넣어주세요."
     );
   }
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
+  return new GoogleGenAI({ apiKey });
+}
+
+async function generateJson(prompt: string): Promise<unknown> {
+  const ai = getClient();
+  const response = await ai.models.generateContent({
     model: MODEL_NAME,
-    generationConfig: { responseMimeType: "application/json" },
+    contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
+
+  const text = response.text;
+  if (!text) throw new Error("Gemini가 빈 응답을 반환했어요.");
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Gemini 응답을 해석할 수 없어요.");
+  }
 }
 
 export type DreamSymbol = { name: string; meaning: string };
@@ -26,21 +42,10 @@ export type DreamInterpretation = {
   advice: string;
 };
 
-function extractJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error("Gemini 응답을 해석할 수 없어요.");
-  }
-}
-
 export async function interpretDream(
   dreamText: string,
   moodTags: string[]
 ): Promise<DreamInterpretation> {
-  const model = getModel();
   const prompt = `당신은 따뜻하고 통찰력 있는 해몽가입니다. 아래 꿈 이야기를 한국어로 해석해주세요.
 전통 해몽과 심리학적 관점을 함께 참고하되, 불안을 조장하지 말고 공감과 위로가 느껴지도록 적어주세요.
 
@@ -58,8 +63,7 @@ export async function interpretDream(
 }
 symbols는 2개에서 4개 사이로 뽑아주세요.`;
 
-  const result = await model.generateContent(prompt);
-  const parsed = extractJson(result.response.text()) as DreamInterpretation;
+  const parsed = (await generateJson(prompt)) as DreamInterpretation;
 
   if (!parsed.title || !parsed.mood || !Array.isArray(parsed.symbols) || !parsed.advice) {
     throw new Error("Gemini 응답 형식이 올바르지 않아요.");
@@ -72,7 +76,6 @@ export async function readTarot(
   reversed: boolean,
   dateLabel: string
 ): Promise<string> {
-  const model = getModel();
   const prompt = `당신은 다정한 타로 리더입니다. 아래 카드를 바탕으로 오늘(${dateLabel})의 운세를 한국어 2~3문장으로 짧게 적어주세요.
 과장된 예언 투가 아니라, 담백하고 실용적인 조언 톤으로 적어주세요.
 
@@ -83,8 +86,7 @@ export async function readTarot(
 아래 JSON 형식으로만 답하세요. 다른 설명이나 마크다운은 절대 포함하지 마세요.
 { "advice": "오늘의 한마디" }`;
 
-  const result = await model.generateContent(prompt);
-  const parsed = extractJson(result.response.text()) as { advice: string };
+  const parsed = (await generateJson(prompt)) as { advice: string };
 
   if (!parsed.advice) {
     throw new Error("Gemini 응답 형식이 올바르지 않아요.");

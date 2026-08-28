@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <p className="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-accent">
+        <p className="mb-2 font-mono text-xs tracking-[0.04em] text-accent">
           꿈 해몽
         </p>
         <h1 className="font-serif text-2xl font-bold text-ink text-balance">

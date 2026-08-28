@@ -49,5 +49,5 @@ Gemini 무료 API로 꿈을 해몽하고, 오늘의 타로 한 장을 뽑아보�
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
 - Prisma + Vercel Postgres (Neon)
-- `@google/generative-ai` (`gemini-2.0-flash`)
+- `@google/genai` (`gemini-3.6-flash`)
 - 익명 사용자 식별: `src/middleware.ts`에서 발급하는 `mb_uid` 쿠키
