@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EntryType {
+  DREAM
+  TAROT
+}
+
+model Entry {
+  id        String    @id @default(cuid())
+  userId    String
+  type      EntryType
+
+  // dream fields
+  dreamText String?
+  mood      String?
+  symbols   Json?
+  advice    String?
+  title     String?
+
+  // tarot fields
+  cardName    String?
+  cardKeyword String?
+  reversed    Boolean?
+  tarotAdvice String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
