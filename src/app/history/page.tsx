@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/userId";
 import { formatKoreanDate } from "@/lib/date";
@@ -40,9 +41,10 @@ function EntryList({
       {entries.map((entry) => {
         const isDream = entry.type === "DREAM";
         return (
-          <div
+          <Link
             key={entry.id}
-            className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-4"
+            href={`/history/${entry.id}`}
+            className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-accent/50 hover:bg-surface-2"
           >
             <div
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm ${accent}`}
@@ -62,7 +64,8 @@ function EntryList({
                 {isDream ? entry.mood : entry.tarotAdvice}
               </p>
             </div>
-          </div>
+            <span className="shrink-0 text-sm text-ink-faint">›</span>
+          </Link>
         );
       })}
     </div>
