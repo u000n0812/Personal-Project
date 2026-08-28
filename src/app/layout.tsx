@@ -23,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "몽블랑 — 오늘 밤의 꿈과 운을 풀어드려요",
-  description: "Gemini로 꿈을 해몽하고, 오늘의 타로 한 장을 뽑아보는 밤의 앱, 몽블랑.",
+  description: "꿈을 해몽하고, 오늘의 타로 한 장을 뽑아보는 밤의 앱, 몽블랑.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
