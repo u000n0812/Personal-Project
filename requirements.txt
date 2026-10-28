@@ -1,12 +1,15 @@
-streamlit>=1.40
-pandas>=2.1
+# Keep this file plain ASCII: older pip on Windows reads it with the system
+# code page (e.g. cp949 on Korean Windows) and fails on non-ASCII characters.
+streamlit>=1.50
+pandas>=2.2
 numpy>=1.26
 plotly>=5.20
 python-dotenv>=1.0
 pyarrow>=15            # Parquet peer snapshots
-# Company Analysis page — free public data, no API keys
+tzdata                 # time zones on Windows (no system tz database)
+# Company Analysis page: free public data, no API keys
 yfinance>=1.0
 finance-datareader>=0.9.90
-# PyKis — KIS Open API wrapper (import name: `pykis`). Only needed for live
+# PyKis - KIS Open API wrapper (import name: `pykis`). Only needed for live
 # mode; the app runs fully on synthetic data without it.
 python-kis>=2.0

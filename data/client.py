@@ -100,7 +100,8 @@ def _live_holdings() -> pd.DataFrame:
                 "name": str(_first_attr(stock, "name", default="")),
                 "quantity": float(_first_attr(stock, "qty", "quantity", default=0)),
                 "avg_price": float(
-                    _first_attr(stock, "purchase_price", "avg_price", "purchase_amount", default=0)
+                    # per-share average; never fall back to purchase_amount (a total)
+                    _first_attr(stock, "purchase_price", "avg_price", default=0)
                 ),
                 "current_price": float(_first_attr(stock, "price", "current_price", default=0)),
             }
