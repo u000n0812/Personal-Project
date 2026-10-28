@@ -7,6 +7,7 @@ Credentials are loaded from a `.env` file in the project root (see
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -41,6 +42,50 @@ COMMODITY_ETFS: dict[str, str] = {
     "138910": "KODEX Copper Futures(H) — PLACEHOLDER",
     "137610": "TIGER Agriculture Futures Enhanced(H) — PLACEHOLDER",
 }
+
+# ---------------------------------------------------------------------------
+# ⚠️  PLACEHOLDER SCREENING UNIVERSE for the Market Leaders page.
+#
+# Large-cap KOSPI names so the cross-sectional ranking has something to rank
+# against. Ignored when a fundamentals file exists (FUNDAMENTALS_PATH): the
+# file's tickers then define the universe. Your holdings are always added.
+# ---------------------------------------------------------------------------
+SCREEN_UNIVERSE: dict[str, str] = {
+    "005930": "Samsung Electronics", "000660": "SK Hynix",
+    "373220": "LG Energy Solution", "207940": "Samsung Biologics",
+    "005380": "Hyundai Motor", "000270": "Kia",
+    "068270": "Celltrion", "035420": "NAVER",
+    "005490": "POSCO Holdings", "051910": "LG Chem",
+    "105560": "KB Financial Group", "055550": "Shinhan Financial Group",
+    "086790": "Hana Financial Group", "316140": "Woori Financial Group",
+    "035720": "Kakao", "012330": "Hyundai Mobis",
+    "028260": "Samsung C&T", "006400": "Samsung SDI",
+    "066570": "LG Electronics", "096770": "SK Innovation",
+    "034730": "SK Inc.", "015760": "KEPCO",
+    "032830": "Samsung Life Insurance", "012450": "Hanwha Aerospace",
+    "329180": "HD Hyundai Heavy Industries", "009540": "HD Korea Shipbuilding",
+    "042660": "Hanwha Ocean", "017670": "SK Telecom",
+    "030200": "KT", "033780": "KT&G",
+    "011200": "HMM", "010130": "Korea Zinc",
+    "018260": "Samsung SDS", "003550": "LG Corp.",
+    "259960": "Krafton", "003670": "POSCO Future M",
+}
+
+# Fundamentals / consensus data for the leader screen (CSV or Parquet; schema
+# in README and factors/definitions.py). Relative paths resolve against the
+# project root. When the file is absent, synthetic fundamentals are used.
+FUNDAMENTALS_PATH: str = os.getenv("FUNDAMENTALS_PATH", "data/fundamentals.csv")
+
+
+def fundamentals_path() -> Path:
+    path = Path(FUNDAMENTALS_PATH)
+    return path if path.is_absolute() else Path(__file__).parent / path
+
+
+# Leader classification defaults (percentiles within the screened universe).
+LEADER_ALL_ROUND_PCT: float = 0.60   # every factor group at or above this
+LEADER_STANDOUT_PCT: float = 0.95    # any single factor group at or above this
+LEADER_MIN_COVERAGE: float = 0.5     # share of a group's sub-factors required
 
 # ---------------------------------------------------------------------------
 # App-wide defaults

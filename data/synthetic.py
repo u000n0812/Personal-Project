@@ -89,6 +89,50 @@ def generate_ohlcv(ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Da
     return df
 
 
+_FUNDAMENTAL_MISSING_RATE = 0.04  # per value — exercises the coverage rule
+
+
+def generate_fundamentals(tickers: list[str]) -> pd.DataFrame:
+    """Synthetic fundamentals/consensus metrics, one row per ticker.
+
+    Driven by three latent traits per company (quality, growth, cheapness —
+    cheapness mildly anti-correlated with growth, as in real markets) plus
+    noise, so factor groups are internally coherent. Units follow
+    ``factors.definitions``: fractions, pp changes as fractions.
+    """
+    rows = {}
+    for ticker in tickers:
+        rng = np.random.default_rng(_seed(ticker, "fundamentals"))
+        quality, growth = rng.normal(size=2)
+        cheap = rng.normal() - 0.3 * growth
+
+        def noise(scale: float) -> float:
+            return float(rng.normal(0.0, scale))
+
+        roe = 0.09 + 0.05 * quality + noise(0.03)
+        row = {
+            "earnings_yield": 0.07 + 0.03 * cheap + 0.01 * quality + noise(0.02),
+            "dividend_yield": max(0.0, 0.02 + 0.01 * cheap + noise(0.008)),
+            "book_to_market": float(np.exp(np.log(0.9) + 0.4 * cheap + noise(0.3))),
+            "cash_flow_yield": 0.09 + 0.04 * cheap + 0.02 * quality + noise(0.03),
+            "fwd_revenue_revision": 0.01 + 0.03 * growth + noise(0.02),
+            "fwd_op_margin_change": 0.004 * growth + noise(0.008),
+            "fwd_eps_growth": 0.08 + 0.15 * growth + noise(0.10),
+            "payout_ratio": float(np.clip(0.3 + 0.1 * cheap + noise(0.1), 0.0, 0.9)),
+            "roe": roe,
+            "eps_revision_1m": 0.01 * growth + noise(0.02),
+            "foreign_own_chg_3m": 0.004 * quality + noise(0.012),
+            "fwd_op_margin": 0.08 + 0.04 * quality + noise(0.03),
+            "roic": 0.07 + 0.04 * quality + noise(0.025),
+            "debt_to_equity": float(np.exp(np.log(0.7) - 0.3 * quality + noise(0.4))),
+        }
+        drop = rng.random(len(row)) < _FUNDAMENTAL_MISSING_RATE
+        rows[ticker] = {k: (np.nan if d else v) for (k, v), d in zip(row.items(), drop)}
+    frame = pd.DataFrame.from_dict(rows, orient="index")
+    frame.index.name = "ticker"
+    return frame
+
+
 def generate_holdings(as_of: pd.Timestamp) -> pd.DataFrame:
     """Synthetic account snapshot mirroring what PyKis balance returns.
 

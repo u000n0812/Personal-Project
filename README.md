@@ -26,10 +26,16 @@ which data source is active and has a "force synthetic" toggle.
 
 ```
 app.py                     # entry point (streamlit run app.py)
-config.py                  # credentials loading, ETF universe, defaults
+config.py                  # credentials, ETF + screening universes, defaults
 data/
   client.py                # thin PyKis wrapper + caching + synthetic fallback
+  fundamentals.py          # fundamentals file loader (+ synthetic fallback)
   synthetic.py             # deterministic demo data generator
+factors/
+  definitions.py           # factor catalogue: groups, inputs, units, direction
+  price.py                 # trailing returns + trend-aligned price momentum
+  scoring.py               # percentile scoring + leader classification (pure)
+  pipeline.py              # glue: fetch data → score (shared by pages 1 & 3)
 strategies/
   __init__.py              # THE plug-in contract + registry (STRATEGIES dict)
   tsmom.py                 # reference: time-series momentum
@@ -40,6 +46,7 @@ backtest/
 pages/
   1_Portfolio_Dashboard.py
   2_Commodity_ETF_Backtester.py
+  3_Market_Leaders.py
 ui/theme.py                # chart palette, Plotly template, shared chrome
 tests/smoke_test.py        # engine sanity checks (python -m tests.smoke_test)
 ```
@@ -82,6 +89,67 @@ roll yield from the underlying futures curve (front/next contract prices) or the
 issuer's roll schedule, returning an **annualized** rate so cross-sectional
 ranking stays comparable.
 
+## Market Leaders screen
+
+`pages/3_Market_Leaders.py` ranks a stock universe on four factor groups and
+flags **market leaders**: stocks that rank highly on *all four*, or
+exceptionally on *at least one*.
+
+| Group | Inputs |
+|---|---|
+| **Value** | earnings yield (E/P), dividend yield, book-to-market (B/P), cash-flow yield |
+| **Growth** | fwd-12M revenue revision, fwd-12M op-margin change, fwd-12M EPS growth, long-term growth (ROE × retention) |
+| **Momentum** | 1M EPS revision, price momentum (1/3/6/12M, trend-aligned), 3M foreign-ownership change |
+| **Quality** | fwd-12M operating margin, ROE, ROIC, debt-to-equity (lower = better) |
+
+**Scoring** (`factors/scoring.py`, pure pandas): every input is ranked into a
+percentile across the universe, direction-adjusted so 100 = best. A group is
+the mean of its inputs' percentiles, re-ranked. Then:
+
+- **All-round leader** — every group ≥ 60th percentile (sidebar slider)
+- **Standout leader** — any group ≥ 95th percentile (sidebar slider)
+
+Price momentum averages the 1/3/6/12-month return ranks, then shrinks toward
+neutral when the horizons disagree in direction. Tags add context:
+*Operating leverage* (revenue and margin estimates both rising),
+*Value-trap risk* (cheap with no growth/momentum confirmation),
+*Speculative risk* (strong momentum on weak quality).
+
+**Missing data:** a NaN input drops out of its own ranking only. A group
+needs ≥ 50% of its inputs, otherwise it's blank, and a stock with a blank
+group can't be all-round. Percentiles are relative to the screened universe.
+In "holdings only" mode that means leaders *within your portfolio*.
+
+The Portfolio Dashboard shows each holding's leader status and the share of
+your portfolio in leaders, using the same scoring.
+
+### Where to plug in real fundamentals
+
+The KIS API doesn't provide forward-12M consensus estimates, so fundamentals
+come from a **file you supply**: `data/fundamentals.csv` (or `.parquet`, or
+any path in the `FUNDAMENTALS_PATH` env var). One row per stock:
+
+```
+ticker,name,earnings_yield,dividend_yield,book_to_market,cash_flow_yield,
+fwd_revenue_revision,fwd_op_margin_change,fwd_eps_growth,long_term_growth,
+payout_ratio,eps_revision_1m,foreign_own_chg_3m,fwd_op_margin,roe,roic,debt_to_equity
+```
+
+- All rates are fractions (`0.05` = 5%). `*_change`/`*_chg_*` columns hold
+  percentage-point changes as fractions (`0.01` = +1pp).
+- `ticker` is the 6-digit KRX code; leading zeros are restored if your export
+  drops them. `long_term_growth` may be omitted: it's derived from `roe` and
+  `payout_ratio`.
+- When the file exists, **its tickers define the screening universe** (plus
+  your holdings). Missing columns and uncovered tickers are reported on the page.
+- Without a file, deterministic synthetic fundamentals are used, and the page
+  says so prominently.
+
+The full column reference (definitions, units, direction) is in the page's
+*Methodology & data schema* expander and in `factors/definitions.py`. To add or
+drop an input, edit `SUB_FACTORS` there; scoring and UI follow automatically.
+For a live source, see the `TODO(you)` in `data/fundamentals.py`.
+
 ## Placeholder ETF universe
 
 `config.COMMODITY_ETFS` ships with example Korean-listed commodity ETF codes
@@ -121,4 +189,6 @@ python -m tests.smoke_test
 ```
 
 Runs the synthetic generator through both reference strategies and the engine,
-asserting alignment, no-lookahead timing, and metric sanity.
+asserting alignment, no-lookahead timing, and metric sanity. It also checks the
+leader screen: factor directions, negative-equity handling, the long-term-growth
+derivation, both leader rules, the coverage rule, and trend agreement.

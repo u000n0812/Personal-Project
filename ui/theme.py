@@ -31,6 +31,18 @@ BASELINE = "#c3c2b7"
 # Diverging scale for signed values (blue ← gray → red, Korean polarity).
 DIVERGING = [[0.0, DOWN], [0.5, "#f0efec"], [1.0, UP]]
 
+# Sequential one-hue ramp for magnitudes such as percentiles (light → dark).
+SEQUENTIAL = [[0.0, "#cde2fb"], [0.25, "#86b6ef"], [0.5, "#3987e5"],
+              [0.75, "#1c5cab"], [1.0, "#0d366b"]]
+
+# Factor groups → fixed categorical slots (same color on every chart).
+GROUP_COLORS = {"Value": PALETTE[0], "Growth": PALETTE[1],
+                "Momentum": PALETTE[2], "Quality": PALETTE[3]}
+
+# Leader classes use slots that don't collide with group colors or P/L red.
+LEADER_COLORS = {"All-round leader": PALETTE[4], "Standout leader": PALETTE[7],
+                 "": MUTED}
+
 
 def register_theme() -> None:
     """Install a project-wide Plotly template. Call once per page."""

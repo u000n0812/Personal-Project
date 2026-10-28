@@ -28,7 +28,7 @@ if mode == "synthetic":
         icon="🧪",
     )
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.subheader("📊 Portfolio Dashboard")
     st.write(
@@ -43,6 +43,13 @@ with col2:
         "instant re-runs on every parameter change."
     )
     st.page_link("pages/2_Commodity_ETF_Backtester.py", label="Open Backtester →")
+with col3:
+    st.subheader("🏆 Market Leaders")
+    st.write(
+        "Screens stocks on Value, Growth, Momentum and Quality and flags "
+        "all-round and standout market leaders."
+    )
+    st.page_link("pages/3_Market_Leaders.py", label="Open Market Leaders →")
 
 st.divider()
 st.markdown(

@@ -13,6 +13,7 @@ import streamlit as st
 
 import config
 from data import client
+from factors import pipeline as leader_pipeline
 from strategies import carry as carry_mod
 from ui import theme
 
@@ -73,6 +74,18 @@ def zscore(s: pd.Series) -> pd.Series:
 holdings["momentum_z"] = zscore(holdings.momentum)
 holdings["carry_z"] = zscore(holdings.carry)
 
+# Leader status — scored against the full screening universe, with the
+# thresholds last set on the Market Leaders page.
+all_round, standout = leader_pipeline.get_thresholds()
+board, _ = leader_pipeline.build_leaderboard(
+    leader_pipeline.resolve_universe(holdings), mode, all_round, standout
+)
+leader_label = board.table.classification.str.replace(" leader", "").where(
+    board.table.standout_in == "",
+    board.table.classification.str.replace(" leader", "") + " · " + board.table.standout_in,
+)
+holdings["leader"] = holdings.ticker.map(leader_label).fillna("")
+
 # ---------------------------------------------------------------------------
 # KPI row
 # ---------------------------------------------------------------------------
@@ -80,13 +93,22 @@ total_mv = holdings.market_value.sum()
 total_pl_pct = holdings.pl_krw.sum() / holdings.cost_value.sum()
 port_momentum = float((holdings.weight * holdings.momentum).sum())
 
-k1, k2, k3 = st.columns(3)
+leader_weight = holdings.loc[holdings.leader != "", "weight"].sum()
+
+k1, k2, k3, k4 = st.columns(4)
 k1.metric("Total market value", theme.krw(total_mv))
 k2.metric("Unrealized P/L", theme.krw(holdings.pl_krw.sum()), delta=theme.pct(total_pl_pct))
 k3.metric(
     f"Portfolio momentum ({window}d)",
     theme.pct(port_momentum),
     help="Value-weighted trailing return across holdings.",
+)
+k4.metric(
+    "In market leaders",
+    f"{leader_weight:.0%}",
+    help=f"Share of market value in holdings flagged as market leaders "
+         f"({(holdings.leader != '').sum()} of {len(holdings)} positions). "
+         "See the Market Leaders page.",
 )
 
 st.divider()
@@ -100,7 +122,7 @@ for col in ("avg_price", "current_price", "market_value", "pl_krw"):
     display[col] = display[col].round(0)  # whole ₩ in the table
 st.dataframe(
     display[["ticker", "name", "quantity", "avg_price", "current_price",
-             "market_value", "pl_krw", "pl_pct", "weight"]],
+             "market_value", "pl_krw", "pl_pct", "weight", "leader"]],
     hide_index=True,
     width="stretch",
     column_config={
@@ -114,8 +136,14 @@ st.dataframe(
         "pl_pct": st.column_config.NumberColumn("P/L (%)", format="percent"),
         "weight": st.column_config.ProgressColumn("Weight", format="percent",
                                                   min_value=0, max_value=1),
+        "leader": st.column_config.TextColumn(
+            "Market leader", width="medium",
+            help="All-round = every factor group strong; Standout = exceptional in "
+                 "the listed group. See the Market Leaders page.",
+        ),
     },
 )
+st.page_link("pages/3_Market_Leaders.py", label="Full market-leader screen →", icon="🏆")
 
 # ---------------------------------------------------------------------------
 # Weights donut + P/L bars

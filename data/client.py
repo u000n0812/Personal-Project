@@ -198,7 +198,9 @@ def get_holdings(mode: str) -> pd.DataFrame:
 def get_ohlcv(ticker: str, start: pd.Timestamp, end: pd.Timestamp, mode: str) -> pd.DataFrame:
     """Daily OHLCV for one ticker (synthetic frames also carry a ``carry`` column)."""
     start_s, end_s = pd.Timestamp(start).isoformat(), pd.Timestamp(end).isoformat()
-    if mode == "live":
+    # Re-check the failure flag: multi-ticker loops shouldn't retry (and warn)
+    # once per ticker after the first live failure in this run.
+    if mode == "live" and not st.session_state.get("live_failed", False):
         try:
             return _live_ohlcv(ticker, start_s, end_s)
         except Exception as err:  # noqa: BLE001
