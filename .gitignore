@@ -4,6 +4,9 @@
 *.token
 token.json
 
+# Generated market data
+data/snapshots/
+
 # Python
 __pycache__/
 *.py[cod]

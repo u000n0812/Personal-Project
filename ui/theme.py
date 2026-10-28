@@ -66,16 +66,24 @@ def register_theme() -> None:
     pio.templates.default = "quant"
 
 
-def sidebar_mode_badge() -> str:
-    """Render the data-source controls in the sidebar; return the mode."""
+def sidebar_mode_badge(show_status: bool = True) -> str:
+    """Render the data-source controls in the sidebar; return the KIS mode.
+
+    ``show_status=False`` renders only the synthetic toggle, for pages that
+    show their own data-source status.
+    """
     with st.sidebar:
         st.toggle(
             "Force synthetic data",
             key="force_synthetic",
-            value=st.session_state.get("force_synthetic", not config.has_credentials()),
-            help="Run on the deterministic demo data even if API keys exist.",
+            # Off by default: without KIS keys the KIS pages fall back to synthetic
+            # anyway, and the Company Analysis page needs no keys at all.
+            value=st.session_state.get("force_synthetic", False),
+            help="Run on the deterministic demo data even if live sources are available.",
         )
         mode = client.resolve_mode()
+        if not show_status:
+            return mode
         if mode == "live":
             st.success("Data source: **KIS live**", icon="🔌")
         else:

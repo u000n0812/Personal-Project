@@ -51,6 +51,14 @@ with col3:
     )
     st.page_link("pages/3_Market_Leaders.py", label="Open Market Leaders →")
 
+st.subheader("🔎 Company Analysis")
+st.write(
+    "Pick any KOSPI or NASDAQ company: live price and fundamentals, scored on the "
+    "four factors and ranked against the largest companies in its market. "
+    "Uses free public data — no API keys needed."
+)
+st.page_link("pages/4_Company_Analysis.py", label="Open Company Analysis →")
+
 st.divider()
 st.markdown(
     f"""

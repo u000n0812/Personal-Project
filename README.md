@@ -31,11 +31,15 @@ data/
   client.py                # thin PyKis wrapper + caching + synthetic fallback
   fundamentals.py          # fundamentals file loader (+ synthetic fallback)
   synthetic.py             # deterministic demo data generator
+  providers/               # market-data providers: Yahoo+FDR (free), synthetic
+  snapshot.py              # daily top-N peer snapshots (CLI: python -m data.snapshot)
+  company.py               # Streamlit caching, KIS quote override, fallbacks
 factors/
   definitions.py           # factor catalogue: groups, inputs, units, direction
   price.py                 # trailing returns + trend-aligned price momentum
   scoring.py               # percentile scoring + leader classification (pure)
   pipeline.py              # glue: fetch data → score (shared by pages 1 & 3)
+  company.py               # score one company against its market's peers (pure)
 strategies/
   __init__.py              # THE plug-in contract + registry (STRATEGIES dict)
   tsmom.py                 # reference: time-series momentum
@@ -47,8 +51,11 @@ pages/
   1_Portfolio_Dashboard.py
   2_Commodity_ETF_Backtester.py
   3_Market_Leaders.py
+  4_Company_Analysis.py
 ui/theme.py                # chart palette, Plotly template, shared chrome
-tests/smoke_test.py        # engine sanity checks (python -m tests.smoke_test)
+ui/factor_charts.py        # sub-factor chart shared by pages 3 & 4
+tests/smoke_test.py        # engine + leader-screen checks (python -m tests.smoke_test)
+tests/test_company.py      # Yahoo parsing, freshness, ranking, snapshots (offline)
 ```
 
 ## Swapping in your own strategy
@@ -149,6 +156,65 @@ The full column reference (definitions, units, direction) is in the page's
 *Methodology & data schema* expander and in `factors/definitions.py`. To add or
 drop an input, edit `SUB_FACTORS` there; scoring and UI follow automatically.
 For a live source, see the `TODO(you)` in `data/fundamentals.py`.
+
+## Company Analysis (any KOSPI / NASDAQ company)
+
+`pages/4_Company_Analysis.py`: pick any KOSPI or NASDAQ listing (searchable,
+or type a ticker). The page fetches the company's latest price and
+fundamentals, scores it on Value / Growth / Momentum / Quality, and ranks it
+against the **300 largest companies in its market** (`PEER_TOP_N` in `.env`).
+It shows the composite score, market rank, per-factor percentiles and ranks,
+sector rank, leader status, and an input-by-input breakdown vs. the market median.
+
+**Data — free, no API keys.** Listings come from FinanceDataReader (KRX
+listing cache; Naver's NASDAQ ranking by market value). Prices, fundamentals
+and analyst estimates come from Yahoo Finance via `yfinance`.
+
+| | Source | Freshness |
+|---|---|---|
+| Price (with KIS keys in `.env`) | KIS quote | real-time |
+| Price (no keys) | Yahoo | NASDAQ near real-time · KRX ~20 min delayed · previous close outside hours |
+| Selected company's fundamentals | Yahoo, fetched live | cached 6h |
+| Peers | daily Parquet snapshot | prices as of the snapshot date |
+
+Each quote's own timestamp drives the freshness badge (Real-time / Intraday ·
+N min delayed / Previous close), so the page never claims to be fresher than
+the data is.
+
+**Peer snapshots.** Ranking against a market needs every peer's fundamentals.
+That's ~1,200 Yahoo requests per market, too many for each page load, so peers
+are fetched once a day and saved to `data/snapshots/<market>/<date>.parquet`:
+
+```bash
+python -m data.snapshot --market KOSPI NASDAQ    # a few minutes per market
+```
+
+You can also use the sidebar's *Build snapshot* button. Suggested cron, KST:
+`0 17 * * 1-5` for KOSPI and `0 7 * * 2-6` for NASDAQ. Rate-limited fetches
+back off and retry. Companies that still fail are skipped and counted in the
+snapshot metadata.
+
+**Free-data proxies.** Free sources don't carry consensus *revision history*
+or Korean foreign-ownership data, so these inputs differ from the
+Market Leaders definitions. Each one is flagged in the page's *Note* column:
+
+- Fwd-12M revenue revision → consensus revenue growth for next fiscal year
+- Fwd-12M op-margin change → change over the last two fiscal years (trailing)
+- Fwd-12M operating margin → trailing-12M operating margin
+- Foreign ownership Δ (3M) → unavailable. Momentum is scored on the other two
+  inputs (coverage rule).
+
+Every peer uses the same proxies, so rankings stay like-for-like.
+
+**Fallbacks.** If the listing sources are unreachable, the page uses
+yesterday's snapshot companies, or failing that, synthetic demo data with a
+prominent warning. A failed fetch for the selected company is shown as an
+error, never filled with synthetic numbers.
+
+**Swapping the data vendor:** implement the four methods in
+`data/providers/base.py` (`listing`, `company`, `closes`, `quote`) and register
+the class in `data/providers/__init__.py`. Scoring (`factors/company.py`) and
+the page are vendor-agnostic.
 
 ## Placeholder ETF universe
 

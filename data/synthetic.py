@@ -30,6 +30,30 @@ _SYNTHETIC_POSITIONS: list[tuple[str, str, int]] = [
 
 _MISSING_RATE = 0.005  # fraction of trading days dropped per ticker
 
+# Demo NASDAQ universe for the Company Analysis page in synthetic mode.
+SYNTHETIC_NASDAQ: dict[str, str] = {
+    "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "NVIDIA", "AMZN": "Amazon",
+    "GOOGL": "Alphabet", "META": "Meta Platforms", "AVGO": "Broadcom",
+    "TSLA": "Tesla", "COST": "Costco", "NFLX": "Netflix", "AMD": "AMD",
+    "PEP": "PepsiCo", "ADBE": "Adobe", "CSCO": "Cisco", "QCOM": "Qualcomm",
+    "INTC": "Intel", "TXN": "Texas Instruments", "AMGN": "Amgen",
+    "INTU": "Intuit", "ISRG": "Intuitive Surgical", "BKNG": "Booking Holdings",
+    "HON": "Honeywell", "AMAT": "Applied Materials", "SBUX": "Starbucks",
+    "MDLZ": "Mondelez", "GILD": "Gilead Sciences", "ADP": "ADP",
+    "VRTX": "Vertex Pharmaceuticals", "REGN": "Regeneron", "LRCX": "Lam Research",
+    "PANW": "Palo Alto Networks", "MU": "Micron", "ADI": "Analog Devices",
+    "KLAC": "KLA", "SNPS": "Synopsys", "CDNS": "Cadence", "MELI": "MercadoLibre",
+    "PYPL": "PayPal", "ASML": "ASML", "PDD": "PDD Holdings",
+}
+
+SYNTHETIC_SECTORS = ("Technology", "Financial Services", "Healthcare",
+                     "Consumer Cyclical", "Industrials", "Communication Services")
+
+
+def synthetic_sector(ticker: str) -> str:
+    """Deterministic demo sector so sector ranks have something to group by."""
+    return SYNTHETIC_SECTORS[_seed(ticker, "sector") % len(SYNTHETIC_SECTORS)]
+
 
 def _seed(ticker: str, salt: str = "") -> int:
     digest = hashlib.sha256(f"{ticker}:{salt}".encode()).hexdigest()

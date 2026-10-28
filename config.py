@@ -82,6 +82,18 @@ def fundamentals_path() -> Path:
     return path if path.is_absolute() else Path(__file__).parent / path
 
 
+# ---------------------------------------------------------------------------
+# Company Analysis page — markets, peer snapshots
+# ---------------------------------------------------------------------------
+MARKETS: dict[str, dict] = {
+    "KOSPI": {"currency": "KRW", "tz": "Asia/Seoul", "open": "09:00", "close": "15:30"},
+    "NASDAQ": {"currency": "USD", "tz": "America/New_York", "open": "09:30", "close": "16:00"},
+}
+# Peers = the N largest companies by market cap in the selected company's market.
+PEER_TOP_N: int = int(os.getenv("PEER_TOP_N", "300"))
+SNAPSHOT_DIR: Path = Path(os.getenv("SNAPSHOT_DIR", str(Path(__file__).parent / "data" / "snapshots")))
+SNAPSHOT_STALE_DAYS: int = 5  # warn when the peer snapshot is older than this
+
 # Leader classification defaults (percentiles within the screened universe).
 LEADER_ALL_ROUND_PCT: float = 0.60   # every factor group at or above this
 LEADER_STANDOUT_PCT: float = 0.95    # any single factor group at or above this

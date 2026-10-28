@@ -16,8 +16,8 @@ import streamlit as st
 import config
 from data import client
 from factors import pipeline, scoring
-from factors.definitions import GROUPS, SUB_FACTORS, by_group, format_value
-from ui import theme
+from factors.definitions import GROUPS, SUB_FACTORS, format_value
+from ui import factor_charts, theme
 
 st.set_page_config(page_title="Market Leaders", page_icon="🏆", layout="wide")
 theme.register_theme()
@@ -214,31 +214,12 @@ pick = st.selectbox(
                           + (f" — {table.at[t, 'classification']}" if table.at[t, "leader"] else ""),
 )
 
-order = [sf for g in GROUPS for sf in by_group(g)]
+order = factor_charts.SUB_FACTOR_ORDER
 pcts = board.percentiles.loc[pick]
 d1, d2 = st.columns([3, 2])
 
 with d1:
-    bars = go.Figure()
-    for group in GROUPS:
-        sfs = by_group(group)
-        vals = [pcts[sf.key] * 100 for sf in sfs]
-        bars.add_trace(go.Bar(
-            # NaN → zero-length bar so the "n/a" label still renders
-            y=[sf.label for sf in sfs], x=np.nan_to_num(vals), orientation="h", name=group,
-            marker=dict(color=theme.GROUP_COLORS[group], cornerradius=4),
-            text=["n/a" if np.isnan(v) else f"{v:.0f}" for v in vals],
-            textposition="outside", cliponaxis=False,
-            hovertemplate="%{y}: %{x:.0f}th percentile<extra>" + group + "</extra>",
-        ))
-    bars.add_vline(x=50, line=dict(color=theme.BASELINE, dash="dot", width=1))
-    bars.update_layout(
-        height=520, hovermode="closest", bargap=0.35,
-        xaxis=dict(title="Percentile in universe (100 = best)", range=[0, 108]),
-        yaxis=dict(categoryorder="array", categoryarray=[sf.label for sf in order],
-                   autorange="reversed"),
-    )
-    st.plotly_chart(bars, width="stretch")
+    st.plotly_chart(factor_charts.subfactor_bars(pcts), width="stretch")
 
 with d2:
     row = board.table.loc[pick]
