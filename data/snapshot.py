@@ -57,7 +57,7 @@ def build(
 ) -> tuple[pd.DataFrame, dict]:
     """Fetch the top-``top_n`` peers of ``market``. Returns (frame, meta).
 
-    Frame: index ticker; columns name, sector, industry, currency,
+    Frame: index ticker; columns name, name_local, sector, industry, currency,
     market_cap, FUNDAMENTAL_COLUMNS, ret_1M…ret_12M. Companies whose fetch
     fails are skipped and listed in ``meta["failed"]``.
     """
@@ -90,8 +90,11 @@ def build(
                                                               errors="ignore")
     frame.index.name = "ticker"
     frame = frame.join(returns)
+    # Listing name is the local one (Korean for KOSPI) — kept for search/display
+    # next to the provider's (English) name.
     names = listing.set_index("ticker")["name"]
-    frame["name"] = frame["name"].fillna(names.reindex(frame.index))
+    frame["name_local"] = names.reindex(frame.index)
+    frame["name"] = frame["name"].fillna(frame["name_local"])
 
     price_date = close.dropna(how="all").index.max()
     meta = {

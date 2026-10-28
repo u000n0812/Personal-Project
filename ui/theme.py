@@ -72,13 +72,19 @@ def sidebar_mode_badge(show_status: bool = True) -> str:
     ``show_status=False`` renders only the synthetic toggle, for pages that
     show their own data-source status.
     """
+    # Streamlit drops a widget's state when you leave its page, so the choice
+    # lives in a plain key and re-seeds the toggle on every page. Off by
+    # default: without KIS keys the KIS pages fall back to synthetic anyway.
+    st.session_state["force_synthetic"] = st.session_state.get("_force_synthetic", False)
+
+    def _remember() -> None:
+        st.session_state["_force_synthetic"] = st.session_state["force_synthetic"]
+
     with st.sidebar:
         st.toggle(
             "Force synthetic data",
             key="force_synthetic",
-            # Off by default: without KIS keys the KIS pages fall back to synthetic
-            # anyway, and the Company Analysis page needs no keys at all.
-            value=st.session_state.get("force_synthetic", False),
+            on_change=_remember,
             help="Run on the deterministic demo data even if live sources are available.",
         )
         mode = client.resolve_mode()

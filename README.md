@@ -29,7 +29,7 @@ app.py                     # entry point (streamlit run app.py)
 config.py                  # credentials, ETF + screening universes, defaults
 data/
   client.py                # thin PyKis wrapper + caching + synthetic fallback
-  fundamentals.py          # fundamentals file loader (+ synthetic fallback)
+  fundamentals.py          # optional fundamentals override file
   synthetic.py             # deterministic demo data generator
   providers/               # market-data providers: Yahoo+FDR (free), synthetic
   snapshot.py              # daily top-N peer snapshots (CLI: python -m data.snapshot)
@@ -38,8 +38,9 @@ factors/
   definitions.py           # factor catalogue: groups, inputs, units, direction
   price.py                 # trailing returns + trend-aligned price momentum
   scoring.py               # percentile scoring + leader classification (pure)
-  pipeline.py              # glue: fetch data → score (shared by pages 1 & 3)
-  company.py               # score one company against its market's peers (pure)
+  pipeline.py              # glue: snapshots → scores (shared by pages 1, 3, 4, 5)
+  company.py               # score a market (market- or sector-relative) or one company
+  sector.py                # sector ETF performance + per-sector summaries (pure)
 strategies/
   __init__.py              # THE plug-in contract + registry (STRATEGIES dict)
   tsmom.py                 # reference: time-series momentum
@@ -52,10 +53,14 @@ pages/
   2_Commodity_ETF_Backtester.py
   3_Market_Leaders.py
   4_Company_Analysis.py
+  5_Sector_ETFs.py
 ui/theme.py                # chart palette, Plotly template, shared chrome
 ui/factor_charts.py        # sub-factor chart shared by pages 3 & 4
+ui/snapshot_controls.py    # sidebar snapshot status + build button
+ui/tables.py               # table search (ticker / English / Korean name)
 tests/smoke_test.py        # engine + leader-screen checks (python -m tests.smoke_test)
 tests/test_company.py      # Yahoo parsing, freshness, ranking, snapshots (offline)
+tests/test_sectors.py      # sector ranking, search, ETF analytics, overrides (offline)
 ```
 
 ## Swapping in your own strategy
@@ -98,9 +103,25 @@ ranking stays comparable.
 
 ## Market Leaders screen
 
-`pages/3_Market_Leaders.py` ranks a stock universe on four factor groups and
-flags **market leaders**: stocks that rank highly on *all four*, or
-exceptionally on *at least one*.
+`pages/3_Market_Leaders.py` ranks **KOSPI and/or NASDAQ** stocks on four factor
+groups and flags **market leaders**: stocks that rank highly on *all four*, or
+exceptionally on *at least one*. The universe is the top-N companies by market
+cap in each market, from the daily peer snapshots (see Company Analysis below),
+plus your holdings. With **Both**, the two markets share one table, but each
+stock is ranked only within its own market.
+
+- **Search:** matches ticker, English name or Korean listing name (e.g. `삼성`,
+  `Samsung`, `005930`, `NVDA`).
+- **Sector filter:** applies to the table, sector overview and leader map.
+  There are also toggles for leaders only and your holdings only.
+- **Rank within: Market | Sector.** *Sector* ranks each stock only against its
+  own sector (Yahoo's classification). This is a sector-neutral ranking, so
+  structurally cheap or highly leveraged sectors (e.g. banks) don't crowd the
+  Value or Quality lists. Sectors with fewer than `MIN_SECTOR_SIZE` (5)
+  companies are ranked against the whole market; the *Ranked vs* column shows
+  which applied.
+- **Sectors tab:** median factor percentiles per sector (always market-relative,
+  so sectors are comparable), leader counts and share, and median 3M/12M returns.
 
 | Group | Inputs |
 |---|---|
@@ -124,38 +145,63 @@ neutral when the horizons disagree in direction. Tags add context:
 
 **Missing data:** a NaN input drops out of its own ranking only. A group
 needs ≥ 50% of its inputs, otherwise it's blank, and a stock with a blank
-group can't be all-round. Percentiles are relative to the screened universe.
-In "holdings only" mode that means leaders *within your portfolio*.
+group can't be all-round. Percentiles are relative to the ranking scope
+(market or sector).
 
-The Portfolio Dashboard shows each holding's leader status and the share of
-your portfolio in leaders, using the same scoring.
+The Portfolio Dashboard, Market Leaders and Company Analysis pages all rank
+against the same snapshots, so a stock gets the same scores everywhere. The
+dashboard shows each holding's sector, leader status and the share of your
+portfolio in leaders.
 
-### Where to plug in real fundamentals
+### Plugging in better fundamentals (optional override file)
 
-The KIS API doesn't provide forward-12M consensus estimates, so fundamentals
-come from a **file you supply**: `data/fundamentals.csv` (or `.parquet`, or
-any path in the `FUNDAMENTALS_PATH` env var). One row per stock:
+The free data uses proxies for a few consensus inputs (see Company Analysis).
+If you have better data, e.g. FnGuide/DataGuide consensus revisions, put it
+in `data/fundamentals.csv` (or `.parquet`, or any path in the
+`FUNDAMENTALS_PATH` env var). Its values **override** the snapshot's for
+matching tickers, on every page:
 
 ```
-ticker,name,earnings_yield,dividend_yield,book_to_market,cash_flow_yield,
+ticker,earnings_yield,dividend_yield,book_to_market,cash_flow_yield,
 fwd_revenue_revision,fwd_op_margin_change,fwd_eps_growth,long_term_growth,
 payout_ratio,eps_revision_1m,foreign_own_chg_3m,fwd_op_margin,roe,roic,debt_to_equity
 ```
 
+- Supply any subset of the columns. Blank cells don't override.
 - All rates are fractions (`0.05` = 5%). `*_change`/`*_chg_*` columns hold
   percentage-point changes as fractions (`0.01` = +1pp).
-- `ticker` is the 6-digit KRX code; leading zeros are restored if your export
-  drops them. `long_term_growth` may be omitted: it's derived from `roe` and
-  `payout_ratio`.
-- When the file exists, **its tickers define the screening universe** (plus
-  your holdings). Missing columns and uncovered tickers are reported on the page.
-- Without a file, deterministic synthetic fundamentals are used, and the page
-  says so prominently.
+- `ticker`: KRX 6-digit codes (leading zeros are restored if Excel drops
+  them) or NASDAQ symbols. `long_term_growth` may be omitted; it's derived
+  from `roe` and `payout_ratio`.
+- The page reports how many companies and which columns were overridden.
 
 The full column reference (definitions, units, direction) is in the page's
-*Methodology & data schema* expander and in `factors/definitions.py`. To add or
-drop an input, edit `SUB_FACTORS` there; scoring and UI follow automatically.
-For a live source, see the `TODO(you)` in `data/fundamentals.py`.
+*Methodology & data* expander and in `factors/definitions.py`. To add or drop
+an input, edit `SUB_FACTORS` there; scoring and UI follow automatically.
+
+## Sector ETFs
+
+`pages/5_Sector_ETFs.py` tracks one representative ETF per sector against the
+market benchmark, for the US (Select Sector SPDRs vs SPY) and Korea (vs
+KODEX 200):
+
+- **KPIs:** benchmark return, the leading and lagging sectors, and how many
+  sectors beat the benchmark over the chosen period (1M to 3Y).
+- **Charts:**
+  - Period returns for all sectors.
+  - A relative-strength heatmap: sector minus benchmark at 1W, 1M, 3M, 6M, YTD
+    and 1Y. A row that's red across horizons is a persistent leader.
+  - A growth-of-100 comparison of up to 7 sectors. Each sector keeps its color
+    while selected.
+- **Table:** returns, 1Y volatility, max drawdown, and *Name at source*, which
+  shows what each code resolves to.
+- **Leading stocks:** the top-ranked stocks in each sector, from the Market
+  Leaders scores.
+
+The ETF list lives in `config.SECTOR_ETFS`. Sector keys use Yahoo's sector
+names, so each ETF links to its stocks. **The Korean codes (TIGER 200 sector
+series) are placeholders: verify them** using the *Name at source* column, or
+swap in your own.
 
 ## Company Analysis (any KOSPI / NASDAQ company)
 
@@ -252,9 +298,11 @@ wants.
 
 ```bash
 python -m tests.smoke_test
+python -m tests.test_company
+python -m tests.test_sectors
 ```
 
-Runs the synthetic generator through both reference strategies and the engine,
+All three run offline. `smoke_test` runs the synthetic generator through both reference strategies and the engine,
 asserting alignment, no-lookahead timing, and metric sanity. It also checks the
 leader screen: factor directions, negative-equity handling, the long-term-growth
 derivation, both leader rules, the coverage rule, and trend agreement.

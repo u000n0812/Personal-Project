@@ -22,6 +22,7 @@ import streamlit as st
 
 import config
 from data import client, snapshot
+from data.fundamentals import OverrideInfo, apply_overrides
 from data.providers import CompanyData, Quote, get_provider
 
 QUOTE_TTL = 60            # seconds — live price refresh
@@ -100,6 +101,46 @@ def peers(source: str, market: str) -> tuple[pd.DataFrame, dict] | None:
     if path is None:
         return None
     return _load_snapshot(str(path), path.stat().st_mtime)
+
+
+def market_universe(source: str, market: str) -> tuple[pd.DataFrame, dict, OverrideInfo] | None:
+    """Peer snapshot with fundamentals-file overrides applied and a ``market``
+    column — the one universe every page ranks against."""
+    snap = peers(source, market)
+    if snap is None:
+        return None
+    frame, meta = snap
+    info = OverrideInfo()
+    if source != "synthetic":  # never mix real overrides into demo data
+        frame, info = apply_overrides(frame)
+    frame = frame.assign(market=market)
+    if "name_local" not in frame.columns:  # snapshots built before name_local existed
+        frame["name_local"] = frame["name"]
+    return frame, meta, info
+
+
+# ---------------------------------------------------------------------------
+# Sector ETFs
+# ---------------------------------------------------------------------------
+
+
+@st.cache_data(ttl=3600, show_spinner="Fetching ETF prices…")
+def etf_closes(source: str, tickers: tuple[str, ...], market: str, years: int = 3) -> pd.DataFrame:
+    start = pd.Timestamp.today().normalize() - pd.DateOffset(years=years, days=10)
+    close = provider(source).closes(list(tickers), market, start)
+    if close.dropna(how="all").empty:
+        raise LookupError(f"No ETF prices returned for {market}")
+    return close.ffill(limit=config.MAX_FFILL_DAYS)
+
+
+@st.cache_data(ttl=LISTING_TTL, show_spinner=False)
+def security_names(source: str, tickers: tuple[str, ...], market: str) -> dict[str, str]:
+    """Names as the data source knows them — shown next to configured labels
+    so a mistyped ETF code is obvious."""
+    try:
+        return provider(source).security_names(list(tickers), market)
+    except Exception:  # noqa: BLE001 — names are a nice-to-have
+        return {}
 
 
 def rebuild_peers(market: str, progress) -> dict:

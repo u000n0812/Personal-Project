@@ -59,6 +59,13 @@ st.write(
 )
 st.page_link("pages/4_Company_Analysis.py", label="Open Company Analysis →")
 
+st.subheader("📊 Sector ETFs")
+st.write(
+    "One representative ETF per sector (US and Korea) against its benchmark: returns, "
+    "relative strength, risk, and the top-ranked stocks in each sector."
+)
+st.page_link("pages/5_Sector_ETFs.py", label="Open Sector ETFs →")
+
 st.divider()
 st.markdown(
     f"""

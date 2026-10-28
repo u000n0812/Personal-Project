@@ -44,11 +44,8 @@ COMMODITY_ETFS: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# ⚠️  PLACEHOLDER SCREENING UNIVERSE for the Market Leaders page.
-#
-# Large-cap KOSPI names so the cross-sectional ranking has something to rank
-# against. Ignored when a fundamentals file exists (FUNDAMENTALS_PATH): the
-# file's tickers then define the universe. Your holdings are always added.
+# Demo KOSPI universe for synthetic mode. Live rankings use the real top-N
+# companies from the peer snapshots (PEER_TOP_N below), not this list.
 # ---------------------------------------------------------------------------
 SCREEN_UNIVERSE: dict[str, str] = {
     "005930": "Samsung Electronics", "000660": "SK Hynix",
@@ -71,9 +68,9 @@ SCREEN_UNIVERSE: dict[str, str] = {
     "259960": "Krafton", "003670": "POSCO Future M",
 }
 
-# Fundamentals / consensus data for the leader screen (CSV or Parquet; schema
-# in README and factors/definitions.py). Relative paths resolve against the
-# project root. When the file is absent, synthetic fundamentals are used.
+# Optional fundamentals override file (CSV or Parquet; schema in README and
+# factors/definitions.py): its values replace the peer snapshot's for matching
+# tickers. Relative paths resolve against the project root.
 FUNDAMENTALS_PATH: str = os.getenv("FUNDAMENTALS_PATH", "data/fundamentals.csv")
 
 
@@ -93,6 +90,55 @@ MARKETS: dict[str, dict] = {
 PEER_TOP_N: int = int(os.getenv("PEER_TOP_N", "300"))
 SNAPSHOT_DIR: Path = Path(os.getenv("SNAPSHOT_DIR", str(Path(__file__).parent / "data" / "snapshots")))
 SNAPSHOT_STALE_DAYS: int = 5  # warn when the peer snapshot is older than this
+
+# Sector-relative ranking: sectors with fewer companies than this are ranked
+# against the whole market instead (percentiles of 2–3 stocks mean little).
+MIN_SECTOR_SIZE: int = 5
+
+# ---------------------------------------------------------------------------
+# Sector ETFs page. Sector keys use Yahoo's sector names so each ETF links to
+# the matching stocks on the Market Leaders page.
+#
+# US: the Select Sector SPDRs (the standard S&P 500 sector set).
+# ⚠️ KOREA: PLACEHOLDER codes (TIGER 200 sector series, tracking KOSPI 200
+# sector indices) — verify each code before relying on it. The page shows
+# the name each code resolves to at the data source, so a wrong code is
+# visible immediately. Edit this dict to swap in your own ETFs.
+# ---------------------------------------------------------------------------
+SECTOR_ETFS: dict[str, dict] = {
+    "NASDAQ": {
+        "label": "US sectors (S&P 500)",
+        "benchmark": ("SPY", "SPDR S&P 500"),
+        "etfs": [
+            ("Technology", "XLK", "Technology Select Sector SPDR"),
+            ("Communication Services", "XLC", "Communication Services Select Sector SPDR"),
+            ("Consumer Cyclical", "XLY", "Consumer Discretionary Select Sector SPDR"),
+            ("Consumer Defensive", "XLP", "Consumer Staples Select Sector SPDR"),
+            ("Energy", "XLE", "Energy Select Sector SPDR"),
+            ("Financial Services", "XLF", "Financial Select Sector SPDR"),
+            ("Healthcare", "XLV", "Health Care Select Sector SPDR"),
+            ("Industrials", "XLI", "Industrial Select Sector SPDR"),
+            ("Basic Materials", "XLB", "Materials Select Sector SPDR"),
+            ("Real Estate", "XLRE", "Real Estate Select Sector SPDR"),
+            ("Utilities", "XLU", "Utilities Select Sector SPDR"),
+        ],
+    },
+    "KOSPI": {
+        "label": "Korea sectors (KOSPI 200) — PLACEHOLDER codes",
+        "benchmark": ("069500", "KODEX 200"),
+        "etfs": [
+            ("Technology", "139260", "TIGER 200 IT"),
+            ("Financial Services", "139270", "TIGER 200 Financials"),
+            ("Healthcare", "227540", "TIGER 200 Health Care"),
+            ("Consumer Cyclical", "139290", "TIGER 200 Consumer Discretionary"),
+            ("Consumer Defensive", "227560", "TIGER 200 Consumer Staples"),
+            ("Energy", "139250", "TIGER 200 Energy & Chemicals"),
+            ("Basic Materials", "139240", "TIGER 200 Steel & Materials"),
+            ("Industrials", "139230", "TIGER 200 Heavy Industries"),
+            ("Industrials", "139220", "TIGER 200 Construction"),
+        ],
+    },
+}
 
 # Leader classification defaults (percentiles within the screened universe).
 LEADER_ALL_ROUND_PCT: float = 0.60   # every factor group at or above this

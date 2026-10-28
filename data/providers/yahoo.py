@@ -241,6 +241,15 @@ class YahooProvider:
             metrics=metrics, notes=dict(PROXY_NOTES),
         )
 
+    def security_names(self, tickers: list[str], market: str) -> dict[str, str]:
+        out = {}
+        for ticker in tickers:
+            info = _optional(lambda: self.yf.Ticker(yahoo_symbol(ticker, market)).info) or {}
+            name = info.get("longName") or info.get("shortName")
+            if name:
+                out[ticker] = name
+        return out
+
     # -- prices -------------------------------------------------------------
     def closes(self, tickers: list[str], market: str, start: pd.Timestamp) -> pd.DataFrame:
         symbols = {yahoo_symbol(t, market): t for t in tickers}

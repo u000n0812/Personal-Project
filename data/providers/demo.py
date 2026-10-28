@@ -40,6 +40,9 @@ class SyntheticProvider:
             notes={k: "Synthetic demo value." for k in metrics},
         )
 
+    def security_names(self, tickers: list[str], market: str) -> dict[str, str]:
+        return {}  # no "source" names in demo mode; configured labels are shown
+
     def closes(self, tickers: list[str], market: str, start: pd.Timestamp) -> pd.DataFrame:
         end = pd.Timestamp.today().normalize()
         scale = _PRICE_SCALE[market]

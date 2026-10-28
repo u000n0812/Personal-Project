@@ -1,24 +1,14 @@
-"""Fundamental / consensus metrics for the market-leader screen.
+"""Optional fundamentals override file.
 
-Resolution order:
-  1. A file at ``config.FUNDAMENTALS_PATH`` (CSV or Parquet) — the intended
-     plug-in point: export it from your own warehouse/vendor pipeline.
-  2. Synthetic fundamentals (``data.synthetic``) so the page always renders.
+Market data comes from the peer snapshots (``data.snapshot``). If you have
+better inputs — e.g. real consensus revisions from FnGuide/DataGuide in place
+of the free-data proxies — export them to ``config.FUNDAMENTALS_PATH`` (CSV or
+Parquet) and they override the snapshot values wherever they are provided.
 
-File schema: one row per stock, a ``ticker`` column (6-digit KRX code;
-leading zeros restored automatically), an optional ``name`` column, and the
-metric columns in ``factors.definitions.FUNDAMENTAL_COLUMNS``. Missing
-columns are reported and treated as NaN; extra columns are ignored.
-
-# ----------------------------------------------------------------------
-# TODO(you): wire a live source here if you'd rather not go via a file.
-#
-# The KIS Open API covers only part of this schema — trailing ratios
-# (ROE, debt ratio, EPS/BPS) under its domestic financial-ratio endpoints,
-# and the current foreign-ownership ratio on the price quote. The
-# forward-12M consensus inputs (revenue/EPS/op-margin estimates and their
-# revisions) need a consensus vendor such as FnGuide/DataGuide.
-# ----------------------------------------------------------------------
+File schema: a ``ticker`` column (KRX 6-digit codes get their leading zeros
+restored; NASDAQ symbols as-is) plus any subset of the metric columns in
+``factors.definitions.FUNDAMENTAL_COLUMNS``. Blank cells don't override.
+Unknown columns are ignored.
 """
 
 from __future__ import annotations
@@ -30,63 +20,56 @@ import pandas as pd
 import streamlit as st
 
 import config
-from data import synthetic
 from factors.definitions import FUNDAMENTAL_COLUMNS
 
 
 @dataclass
-class Fundamentals:
-    frame: pd.DataFrame                 # tickers × FUNDAMENTAL_COLUMNS
-    source: str                         # "file" | "synthetic"
-    detail: str = ""                    # human-readable provenance
-    missing_columns: list[str] = field(default_factory=list)
-    missing_tickers: list[str] = field(default_factory=list)
+class OverrideInfo:
+    path: str = ""
+    columns: list[str] = field(default_factory=list)   # metric columns applied
+    tickers: int = 0                                   # rows that matched
+
+
+def _normalize(ticker: str) -> str:
+    ticker = str(ticker).strip().upper()
+    return ticker.zfill(6) if ticker.isdigit() else ticker
 
 
 @st.cache_data(show_spinner=False)
 def _load_file(path: str, mtime: float) -> pd.DataFrame:
-    """Read the fundamentals file. ``mtime`` is only a cache key, so editing
-    the file invalidates the cache on the next rerun."""
+    """Read the override file. ``mtime`` is only a cache key, so editing the
+    file invalidates the cache on the next rerun."""
     p = Path(path)
     if p.suffix.lower() == ".parquet":
         df = pd.read_parquet(p)
     else:
-        df = pd.read_csv(p, dtype={"ticker": str})
-    df["ticker"] = df["ticker"].astype(str).str.strip().str.zfill(6)
-    return df.drop_duplicates("ticker", keep="last").set_index("ticker")
+        df = pd.read_csv(p, dtype={"ticker": str}, encoding="utf-8-sig")
+    df["ticker"] = df["ticker"].map(_normalize)
+    df = df.drop_duplicates("ticker", keep="last").set_index("ticker")
+    return df[[c for c in FUNDAMENTAL_COLUMNS if c in df.columns]].apply(
+        pd.to_numeric, errors="coerce")
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _synthetic(tickers: tuple[str, ...]) -> pd.DataFrame:
-    return synthetic.generate_fundamentals(list(tickers))
-
-
-def file_universe() -> dict[str, str] | None:
-    """Ticker → name from the fundamentals file, or None if there is no file."""
+def overrides() -> pd.DataFrame | None:
     path = config.fundamentals_path()
     if not path.exists():
         return None
-    df = _load_file(str(path), path.stat().st_mtime)
-    names = df["name"] if "name" in df.columns else pd.Series(df.index, index=df.index)
-    return names.astype(str).to_dict()
+    return _load_file(str(path), path.stat().st_mtime)
 
 
-def get_fundamentals(tickers: list[str]) -> Fundamentals:
-    """Fundamentals for ``tickers`` from the file if present, else synthetic."""
-    path = config.fundamentals_path()
-    if path.exists():
-        df = _load_file(str(path), path.stat().st_mtime)
-        present = [c for c in FUNDAMENTAL_COLUMNS if c in df.columns]
-        missing = [c for c in FUNDAMENTAL_COLUMNS if c not in df.columns]
-        if {"roe", "payout_ratio"} <= set(present):
-            # derived as ROE × (1 − payout) in factors.scoring — not really missing
-            missing = [c for c in missing if c != "long_term_growth"]
-        return Fundamentals(
-            frame=df[present].reindex(index=tickers, columns=list(FUNDAMENTAL_COLUMNS)),
-            source="file",
-            detail=str(path.name),
-            missing_columns=missing,
-            missing_tickers=[t for t in tickers if t not in df.index],
-        )
-    return Fundamentals(frame=_synthetic(tuple(tickers)), source="synthetic",
-                        detail="deterministic demo data")
+def apply_overrides(frame: pd.DataFrame) -> tuple[pd.DataFrame, OverrideInfo]:
+    """Return ``frame`` with file values (where present) replacing its own."""
+    file = overrides()
+    if file is None or file.empty:
+        return frame, OverrideInfo()
+    hits = file.index.intersection(frame.index)
+    out = frame.copy()
+    if len(hits):
+        patch = file.loc[hits]
+        for col in patch.columns:
+            if col not in out.columns:
+                out[col] = float("nan")
+            out[col] = out[col].astype(float)
+        out.update(patch)  # NaN cells in the file leave snapshot values alone
+    return out, OverrideInfo(path=config.fundamentals_path().name,
+                             columns=list(file.columns), tickers=len(hits))

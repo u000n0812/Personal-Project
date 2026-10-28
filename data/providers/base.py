@@ -6,6 +6,7 @@ A provider supplies four things for a market ("KOSPI" | "NASDAQ"):
 - ``company(ticker, market)``   → CompanyData (profile + factor inputs)
 - ``closes(tickers, market, start)`` → dates × tickers adjusted closes
 - ``quote(ticker, market)``     → Quote (latest price + timestamp)
+- ``security_names(tickers, market)`` → {ticker: name at the source}
 
 Factor inputs follow ``factors.definitions.FUNDAMENTAL_COLUMNS`` (fractions).
 To add a data vendor, implement these four methods and register the class in
@@ -60,6 +61,7 @@ class Provider(Protocol):
     def company(self, ticker: str, market: str) -> CompanyData: ...
     def closes(self, tickers: list[str], market: str, start: pd.Timestamp) -> pd.DataFrame: ...
     def quote(self, ticker: str, market: str) -> Quote: ...
+    def security_names(self, tickers: list[str], market: str) -> dict[str, str]: ...
 
 
 def _session(market: str) -> tuple[ZoneInfo, time, time]:

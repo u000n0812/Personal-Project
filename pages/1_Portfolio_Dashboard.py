@@ -74,17 +74,17 @@ def zscore(s: pd.Series) -> pd.Series:
 holdings["momentum_z"] = zscore(holdings.momentum)
 holdings["carry_z"] = zscore(holdings.carry)
 
-# Leader status — scored against the full screening universe, with the
-# thresholds last set on the Market Leaders page.
+# Leader status + sector — ranked against the KOSPI peer snapshot (same
+# scores as the Market Leaders page), with the thresholds last set there.
 all_round, standout = leader_pipeline.get_thresholds()
-board, _ = leader_pipeline.build_leaderboard(
-    leader_pipeline.resolve_universe(holdings), mode, all_round, standout
-)
-leader_label = board.table.classification.str.replace(" leader", "").where(
-    board.table.standout_in == "",
-    board.table.classification.str.replace(" leader", "") + " · " + board.table.standout_in,
-)
-holdings["leader"] = holdings.ticker.map(leader_label).fillna("")
+kospi = leader_pipeline.market_board(leader_pipeline.resolve_source(), "KOSPI",
+                                     all_round, standout,
+                                     extra_tickers=tuple(holdings.ticker))
+holdings["leader"], holdings["sector"] = "", ""
+if kospi is not None:
+    labels = leader_pipeline.leader_label(kospi.board.table)
+    holdings["leader"] = holdings.ticker.map(labels).fillna("")
+    holdings["sector"] = holdings.ticker.map(kospi.board.table["sector"]).fillna("")
 
 # ---------------------------------------------------------------------------
 # KPI row
@@ -105,7 +105,7 @@ k3.metric(
 )
 k4.metric(
     "In market leaders",
-    f"{leader_weight:.0%}",
+    f"{leader_weight:.0%}" if kospi is not None else "—",
     help=f"Share of market value in holdings flagged as market leaders "
          f"({(holdings.leader != '').sum()} of {len(holdings)} positions). "
          "See the Market Leaders page.",
@@ -121,21 +121,21 @@ display = holdings.copy()
 for col in ("avg_price", "current_price", "market_value", "pl_krw"):
     display[col] = display[col].round(0)  # whole ₩ in the table
 st.dataframe(
-    display[["ticker", "name", "quantity", "avg_price", "current_price",
-             "market_value", "pl_krw", "pl_pct", "weight", "leader"]],
+    display[["ticker", "name", "sector", "leader", "quantity", "avg_price", "current_price",
+             "market_value", "pl_krw", "pl_pct", "weight"]],
     hide_index=True,
     width="stretch",
     column_config={
         "ticker": "Ticker",
         "name": "Name",
+        "sector": "Sector",
         "quantity": st.column_config.NumberColumn("Qty", format="localized"),
         "avg_price": st.column_config.NumberColumn("Avg price (₩)", format="localized"),
         "current_price": st.column_config.NumberColumn("Price (₩)", format="localized"),
         "market_value": st.column_config.NumberColumn("Market value (₩)", format="localized"),
         "pl_krw": st.column_config.NumberColumn("P/L (₩)", format="localized"),
         "pl_pct": st.column_config.NumberColumn("P/L (%)", format="percent"),
-        "weight": st.column_config.ProgressColumn("Weight", format="percent",
-                                                  min_value=0, max_value=1),
+        "weight": st.column_config.NumberColumn("Weight", format="percent"),  # donut below
         "leader": st.column_config.TextColumn(
             "Market leader", width="medium",
             help="All-round = every factor group strong; Standout = exceptional in "
@@ -143,6 +143,11 @@ st.dataframe(
         ),
     },
 )
+if kospi is None:
+    st.caption("Market-leader status and sectors appear once the KOSPI peer snapshot is "
+               "built (Market Leaders page sidebar, or `python -m data.snapshot --market KOSPI`).")
+elif kospi.failed:
+    st.caption(f"Couldn't score {len(kospi.failed)} holding(s): {', '.join(kospi.failed)}")
 st.page_link("pages/3_Market_Leaders.py", label="Full market-leader screen →", icon="🏆")
 
 # ---------------------------------------------------------------------------

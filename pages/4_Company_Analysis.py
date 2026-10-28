@@ -22,7 +22,8 @@ from factors import pipeline as leader_pipeline
 from factors.company import score_company
 from factors.definitions import GROUPS, format_value
 from factors.price import trailing_returns
-from ui import factor_charts, theme
+from data.fundamentals import apply_overrides
+from ui import factor_charts, snapshot_controls, theme
 
 st.set_page_config(page_title="Company Analysis", page_icon="🔎", layout="wide")
 theme.register_theme()
@@ -88,29 +89,11 @@ elif source == "synthetic":
 # ---------------------------------------------------------------------------
 # Peers snapshot
 # ---------------------------------------------------------------------------
-snap = company_data.peers(source, market)
+snap = company_data.market_universe(source, market)  # snapshot + override file
 with st.sidebar:
     st.subheader("Peer universe")
-    if snap is not None:
-        meta = snap[1]
-        st.caption(f"{meta.get('companies', len(snap[0])):,} largest {market} companies · "
-                   f"prices as of {meta.get('price_date', '?')} · {meta.get('provider', '')}")
-        age = company_data.snapshot_age_days(meta)
-        if source == "yahoo" and age is not None and age > config.SNAPSHOT_STALE_DAYS:
-            st.warning(f"Snapshot is {age} days old — rebuild for current rankings.")
-    else:
-        st.warning(f"No {market} peer snapshot yet — rankings need one.")
-    if source == "yahoo" and st.button(f"Build {market} snapshot (top {config.PEER_TOP_N})",
-                                       help="Fetches every peer from Yahoo — a few minutes. "
-                                            "Or schedule `python -m data.snapshot`."):
-        bar = st.progress(0.0, text="Fetching listing and prices…")
-        try:
-            built = company_data.rebuild_peers(market, bar)
-            st.success(f"Built: {built['companies']} companies, {len(built['failed'])} failed.")
-            st.rerun()
-        except Exception as err:  # noqa: BLE001
-            st.error(f"Snapshot build failed — {type(err).__name__}: {err}")
-
+snapshot_controls.peer_status(source, market, snap[1] if snap else None)
+with st.sidebar:
     st.caption(
         "Prices: **KIS real-time**" if source == "yahoo" and config.has_credentials()
         else "Prices: **Yahoo Finance** (US real-time · KRX ~20 min delayed)" if source == "yahoo"
@@ -137,7 +120,10 @@ prices = prices.sort_index()
 returns = trailing_returns(prices.to_frame(ticker)).loc[ticker]
 
 target = pd.Series({**info.metrics, **returns.to_dict(), "name": info.name,
+                    "name_local": names.get(ticker, info.name), "market": market,
                     "sector": info.sector, "industry": info.industry})
+if source != "synthetic":  # override-file values win here too, like for peers
+    target = apply_overrides(target.to_frame(ticker).T)[0].loc[ticker]
 
 # ---------------------------------------------------------------------------
 # Header: identity + live price
@@ -177,7 +163,7 @@ if snap is None:
     }), hide_index=True, width="stretch")
     st.stop()
 
-peers, meta = snap
+peers, meta, _ = snap
 all_round, standout = leader_pipeline.get_thresholds()
 score = score_company(ticker, target, peers, all_round, standout, config.LEADER_MIN_COVERAGE)
 n = score.universe_size
