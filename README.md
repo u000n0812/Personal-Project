@@ -33,6 +33,7 @@ data/
   synthetic.py             # deterministic demo data generator
   providers/               # market-data providers: Yahoo+FDR (free), synthetic
   snapshot.py              # daily top-N peer snapshots (CLI: python -m data.snapshot)
+  indexes.py               # Nasdaq-100 membership (Nasdaq → Wikipedia → cache)
   company.py               # Streamlit caching, KIS quote override, fallbacks
 factors/
   definitions.py           # factor catalogue: groups, inputs, units, direction
@@ -58,9 +59,11 @@ ui/theme.py                # chart palette, Plotly template, shared chrome
 ui/factor_charts.py        # sub-factor chart shared by pages 3 & 4
 ui/snapshot_controls.py    # sidebar snapshot status + build button
 ui/tables.py               # table search (ticker / English / Korean name)
+ui/metric_views.py         # key-metric value columns per factor
 tests/smoke_test.py        # engine + leader-screen checks (python -m tests.smoke_test)
 tests/test_company.py      # Yahoo parsing, freshness, ranking, snapshots (offline)
 tests/test_sectors.py      # sector ranking, search, ETF analytics, overrides (offline)
+tests/test_nasdaq100.py    # Nasdaq-100 parsing/coverage, key-metric values (offline)
 ```
 
 ## Swapping in your own strategy
@@ -110,6 +113,28 @@ cap in each market, from the daily peer snapshots (see Company Analysis below),
 plus your holdings. With **Both**, the two markets share one table, but each
 stock is ranked only within its own market.
 
+- **Universe: KOSPI | NASDAQ | Nasdaq-100 | Both.** The NASDAQ snapshot always
+  includes **every Nasdaq-100 member**, even ones outside the top N. Members
+  get an *NDX ✓* column. *Nasdaq-100* ranks just the index's 100 companies
+  among themselves, one line per company (GOOG is folded into GOOGL).
+  Membership is fetched when the snapshot is built: Nasdaq's official list
+  first, then Wikipedia, then the last list fetched successfully. The page
+  reports coverage, e.g. "all 100 members covered", or names any member that
+  couldn't be fetched.
+- **Columns: Scores | Value | Growth | Momentum | Quality | All metrics.**
+  *Scores* shows factor percentiles. Each factor view shows that factor's
+  **key metric values** per company next to its score:
+
+  | View | Values shown |
+  |---|---|
+  | Value | P/E, earnings yield, P/B, dividend yield, cash-flow yield |
+  | Growth | forward revenue growth, op-margin change (pp), forward EPS growth, long-term growth |
+  | Momentum | 1M / 3M / 6M / 12M returns, 1M EPS revision, 3M foreign-ownership change (pp) |
+  | Quality | operating margin, ROE, ROIC, debt/equity |
+
+  Values stay numeric, so columns sort correctly. *None* means not available,
+  e.g. P/E for a loss-maker. The Portfolio Dashboard has the same views for
+  your holdings (*Key metrics by factor*).
 - **Search:** matches ticker, English name or Korean listing name (e.g. `삼성`,
   `Samsung`, `005930`, `NVDA`).
 - **Sector filter:** applies to the table, sector overview and leader map.
@@ -300,9 +325,10 @@ wants.
 python -m tests.smoke_test
 python -m tests.test_company
 python -m tests.test_sectors
+python -m tests.test_nasdaq100
 ```
 
-All three run offline. `smoke_test` runs the synthetic generator through both reference strategies and the engine,
+All four run offline. `smoke_test` runs the synthetic generator through both reference strategies and the engine,
 asserting alignment, no-lookahead timing, and metric sanity. It also checks the
 leader screen: factor directions, negative-equity handling, the long-term-growth
 derivation, both leader rules, the coverage rule, and trend agreement.

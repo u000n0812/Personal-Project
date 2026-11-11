@@ -10,6 +10,8 @@ tzdata                 # time zones on Windows (no system tz database)
 # Company Analysis page: free public data, no API keys
 yfinance>=1.0
 finance-datareader>=0.9.90
+requests>=2.31         # Nasdaq-100 membership (Nasdaq / Wikipedia)
+beautifulsoup4>=4.12   # Wikipedia fallback parser
 # PyKis - KIS Open API wrapper (import name: `pykis`). Only needed for live
 # mode; the app runs fully on synthetic data without it.
 python-kis>=2.0

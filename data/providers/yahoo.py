@@ -241,6 +241,13 @@ class YahooProvider:
             metrics=metrics, notes=dict(PROXY_NOTES),
         )
 
+    def index_members(self, index: str) -> "Members":
+        from data.indexes import NASDAQ_100, fetch_nasdaq100
+
+        if index != NASDAQ_100:
+            raise ValueError(f"Unknown index {index!r}")
+        return fetch_nasdaq100()
+
     def security_names(self, tickers: list[str], market: str) -> dict[str, str]:
         out = {}
         for ticker in tickers:

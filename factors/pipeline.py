@@ -15,6 +15,7 @@ import streamlit as st
 import config
 from data import company as company_data
 from data.fundamentals import OverrideInfo, apply_overrides
+from data.indexes import NASDAQ_100
 from factors import scoring
 from factors.company import concat_boards, score_market
 from factors.price import trailing_returns
@@ -52,6 +53,10 @@ class MarketBoard:
     failed: dict[str, str] = field(default_factory=dict)  # extras that failed
 
 
+class IndexUnavailable(LookupError):
+    """The snapshot has no membership data for the requested index."""
+
+
 def market_board(
     source: str,
     market: str,
@@ -59,13 +64,26 @@ def market_board(
     standout: float,
     rank_scope: str = "market",
     extra_tickers: tuple[str, ...] = (),
+    index: str | None = None,
 ) -> MarketBoard | None:
     """Score ``market``'s snapshot universe; ``extra_tickers`` not already in
-    it (e.g. your holdings) are fetched live and added. None if no snapshot."""
+    it (e.g. your holdings) are fetched live and added. None if no snapshot.
+
+    ``index="NDX"`` restricts the universe to Nasdaq-100 members, so they are
+    ranked among themselves; raises IndexUnavailable if the snapshot predates
+    membership tracking or the list couldn't be fetched when it was built.
+    """
     universe = company_data.market_universe(source, market)
     if universe is None:
         return None
     frame, meta, overrides = universe
+    if index == NASDAQ_100:
+        if "in_ndx" not in frame.columns:
+            reason = meta.get("indexes", {}).get(NASDAQ_100, {}).get(
+                "error", "this snapshot was built before Nasdaq-100 tracking")
+            raise IndexUnavailable(f"No Nasdaq-100 membership in the {market} snapshot "
+                                   f"({reason}). Rebuild the snapshot.")
+        frame = frame[frame["in_ndx"].fillna(False).astype(bool)]
 
     added, failed, rows = [], {}, []
     for ticker in extra_tickers:

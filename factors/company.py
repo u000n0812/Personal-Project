@@ -19,7 +19,7 @@ import pandas as pd
 from factors import price, scoring
 from factors.definitions import GROUPS
 
-DESCRIPTIVE = ("name", "name_local", "sector", "industry", "currency", "market")
+DESCRIPTIVE = ("name", "name_local", "sector", "industry", "currency", "market", "in_ndx")
 UNCLASSIFIED = "Unclassified"
 
 

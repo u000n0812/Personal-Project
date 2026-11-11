@@ -11,6 +11,7 @@ import pandas as pd
 
 import config
 from data import synthetic
+from data.indexes import NASDAQ_100, Members
 from data.providers.base import CompanyData, Quote, session_close
 
 # Synthetic paths are KRW-scaled; scale NASDAQ names to dollar-like prices.
@@ -39,6 +40,13 @@ class SyntheticProvider:
             market_cap=float(cap), metrics=metrics,
             notes={k: "Synthetic demo value." for k in metrics},
         )
+
+    def index_members(self, index: str) -> Members:
+        if index != NASDAQ_100:
+            raise ValueError(f"Unknown index {index!r}")
+        frame = pd.DataFrame({"ticker": list(synthetic.SYNTHETIC_NDX),
+                              "name": list(synthetic.SYNTHETIC_NDX.values())})
+        return Members(frame, "synthetic", pd.Timestamp.today().date().isoformat())
 
     def security_names(self, tickers: list[str], market: str) -> dict[str, str]:
         return {}  # no "source" names in demo mode; configured labels are shown

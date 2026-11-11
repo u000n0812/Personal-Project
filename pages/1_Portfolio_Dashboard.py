@@ -14,8 +14,10 @@ import streamlit as st
 import config
 from data import client
 from factors import pipeline as leader_pipeline
+from factors.definitions import GROUPS
 from strategies import carry as carry_mod
-from ui import theme
+from ui import metric_views, theme
+from ui.metric_views import metric_values
 
 st.set_page_config(page_title="Portfolio Dashboard", page_icon="📊", layout="wide")
 theme.register_theme()
@@ -234,6 +236,37 @@ with f2:
     heat.update_layout(height=max(300, 34 * len(z)), hovermode="closest",
                        yaxis=dict(autorange="reversed"))
     st.plotly_chart(heat, width="stretch")
+
+# ---------------------------------------------------------------------------
+# Key metric values per holding (same data + scores as Market Leaders)
+# ---------------------------------------------------------------------------
+st.subheader("Key metrics by factor")
+if kospi is None:
+    st.caption("Appears once the KOSPI peer snapshot is built (see above).")
+else:
+    metrics_view = st.segmented_control(
+        "Factor", [*GROUPS, "All metrics"], default="Value", key="dash_metrics_view",
+    ) or "Value"
+    tickers = [t for t in holdings.ticker if t in kospi.board.metrics.index]
+    values = metric_values(kospi.board.metrics.loc[tickers])
+    scores = (kospi.board.groups.loc[tickers, list(GROUPS)] * 100).round(0)
+    frame = holdings.set_index("ticker")[["name", "weight"]].loc[tickers].join(scores).join(values)
+    score_cols = list(GROUPS) if metrics_view == "All metrics" else [metrics_view]
+    value_cols = [c.key for c in metric_views.view_columns(metrics_view)]
+    st.dataframe(
+        frame.reset_index()[["ticker", "name", "weight", *score_cols, *value_cols]],
+        hide_index=True, width="stretch",
+        column_config={
+            "ticker": "Ticker", "name": "Name",
+            "weight": st.column_config.NumberColumn("Weight", format="percent"),
+            **{g: st.column_config.NumberColumn(f"{g} score", format="%d",
+                                                help="Percentile vs KOSPI peers (100 = best).")
+               for g in GROUPS},
+            **metric_views.column_config(metrics_view),
+        },
+    )
+    st.caption("Reported values from the KOSPI peer snapshot; scores are percentiles vs the "
+               "KOSPI universe. *None* = not available. Hover a header for its definition.")
 
 # ---------------------------------------------------------------------------
 # Account NAV (only when the live endpoint provides it)

@@ -30,6 +30,7 @@ from typing import Callable
 import pandas as pd
 
 import config
+from data.indexes import NASDAQ_100
 from data.providers import Provider, get_provider
 from factors.price import trailing_returns
 
@@ -58,10 +59,28 @@ def build(
     """Fetch the top-``top_n`` peers of ``market``. Returns (frame, meta).
 
     Frame: index ticker; columns name, name_local, sector, industry, currency,
-    market_cap, FUNDAMENTAL_COLUMNS, ret_1M…ret_12M. Companies whose fetch
-    fails are skipped and listed in ``meta["failed"]``.
+    market_cap, FUNDAMENTAL_COLUMNS, ret_1M…ret_12M; NASDAQ adds ``in_ndx``.
+    For NASDAQ, every Nasdaq-100 member is included even if it falls outside
+    the top N; ``meta["indexes"]["NDX"]`` records the list's source and how
+    many members were covered. Companies whose fetch fails are skipped and
+    listed in ``meta["failed"]``.
     """
-    listing = provider.listing(market).head(top_n)
+    full_listing = provider.listing(market)
+    listing = full_listing.head(top_n)
+
+    # NASDAQ: guarantee every Nasdaq-100 member is covered, whatever its rank.
+    ndx, index_meta = None, {}
+    if market == "NASDAQ":
+        try:
+            members = provider.index_members(NASDAQ_100)
+            ndx = set(members.frame["ticker"])
+            extra = members.frame[~members.frame["ticker"].isin(listing["ticker"])]
+            listing = pd.concat([listing, extra.assign(market_cap=float("nan"))],
+                                ignore_index=True)
+            index_meta[NASDAQ_100] = {"source": members.source, "as_of": members.as_of,
+                                      "members": len(ndx), "added_beyond_top_n": len(extra)}
+        except Exception as err:  # noqa: BLE001 — snapshot still useful without it
+            index_meta[NASDAQ_100] = {"error": f"{type(err).__name__}: {err}"[:300]}
     tickers = list(listing["ticker"])
 
     start = pd.Timestamp.today().normalize() - pd.Timedelta(days=PRICE_HISTORY_DAYS)
@@ -92,9 +111,15 @@ def build(
     frame = frame.join(returns)
     # Listing name is the local one (Korean for KOSPI) — kept for search/display
     # next to the provider's (English) name.
-    names = listing.set_index("ticker")["name"]
+    names = full_listing.set_index("ticker")["name"].combine_first(
+        listing.set_index("ticker")["name"])
     frame["name_local"] = names.reindex(frame.index)
     frame["name"] = frame["name"].fillna(frame["name_local"])
+
+    if ndx is not None:
+        frame["in_ndx"] = frame.index.isin(ndx)
+        index_meta[NASDAQ_100]["covered"] = int(frame["in_ndx"].sum())
+        index_meta[NASDAQ_100]["missing"] = sorted(ndx - set(frame.index))
 
     price_date = close.dropna(how="all").index.max()
     meta = {
@@ -105,6 +130,7 @@ def build(
         "built_at": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"),
         "companies": len(frame),
         "failed": failed,
+        "indexes": index_meta,
     }
     return frame, meta
 

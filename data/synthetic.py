@@ -30,8 +30,9 @@ _SYNTHETIC_POSITIONS: list[tuple[str, str, int]] = [
 
 _MISSING_RATE = 0.005  # fraction of trading days dropped per ticker
 
-# Demo NASDAQ universe for the Company Analysis page in synthetic mode.
-SYNTHETIC_NASDAQ: dict[str, str] = {
+# Demo Nasdaq-100 for synthetic mode only. Live mode fetches the current
+# membership (data/indexes.py); this list is illustrative and may be stale.
+SYNTHETIC_NDX: dict[str, str] = {
     "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "NVIDIA", "AMZN": "Amazon",
     "GOOGL": "Alphabet", "META": "Meta Platforms", "AVGO": "Broadcom",
     "TSLA": "Tesla", "COST": "Costco", "NFLX": "Netflix", "AMD": "AMD",
@@ -44,6 +45,34 @@ SYNTHETIC_NASDAQ: dict[str, str] = {
     "PANW": "Palo Alto Networks", "MU": "Micron", "ADI": "Analog Devices",
     "KLAC": "KLA", "SNPS": "Synopsys", "CDNS": "Cadence", "MELI": "MercadoLibre",
     "PYPL": "PayPal", "ASML": "ASML", "PDD": "PDD Holdings",
+    "TMUS": "T-Mobile US", "LIN": "Linde", "AZN": "AstraZeneca", "CMCSA": "Comcast",
+    "ARM": "Arm Holdings", "CRWD": "CrowdStrike", "CEG": "Constellation Energy",
+    "APP": "AppLovin", "CTAS": "Cintas", "FTNT": "Fortinet", "DASH": "DoorDash",
+    "MAR": "Marriott", "ABNB": "Airbnb", "ORLY": "O'Reilly Automotive",
+    "MRVL": "Marvell", "WDAY": "Workday", "CSX": "CSX", "ROP": "Roper",
+    "AEP": "American Electric Power", "ADSK": "Autodesk", "MNST": "Monster Beverage",
+    "CHTR": "Charter", "PCAR": "PACCAR", "TTD": "The Trade Desk", "NXPI": "NXP",
+    "FAST": "Fastenal", "PAYX": "Paychex", "KDP": "Keurig Dr Pepper", "CPRT": "Copart",
+    "ROST": "Ross Stores", "AXON": "Axon", "EXC": "Exelon", "VRSK": "Verisk",
+    "DDOG": "Datadog", "FANG": "Diamondback Energy", "CTSH": "Cognizant",
+    "KHC": "Kraft Heinz", "LULU": "Lululemon", "XEL": "Xcel Energy",
+    "TEAM": "Atlassian", "ODFL": "Old Dominion", "EA": "Electronic Arts",
+    "GEHC": "GE HealthCare", "CCEP": "Coca-Cola Europacific", "IDXX": "IDEXX",
+    "ZS": "Zscaler", "BKR": "Baker Hughes", "MCHP": "Microchip", "CSGP": "CoStar",
+    "TTWO": "Take-Two", "DXCM": "Dexcom", "WBD": "Warner Bros. Discovery",
+    "CDW": "CDW", "ON": "ON Semiconductor", "GFS": "GlobalFoundries",
+    "BIIB": "Biogen", "MDB": "MongoDB", "PLTR": "Palantir", "MSTR": "Strategy",
+    "SHOP": "Shopify",
+}
+
+# Demo NASDAQ universe = the demo Nasdaq-100 plus some non-members (the index
+# excludes financials, for one), so "NASDAQ" and "Nasdaq-100" views differ.
+SYNTHETIC_NASDAQ: dict[str, str] = {
+    **SYNTHETIC_NDX,
+    "NDAQ": "Nasdaq Inc.", "TROW": "T. Rowe Price", "HOOD": "Robinhood",
+    "IBKR": "Interactive Brokers", "FITB": "Fifth Third", "HBAN": "Huntington",
+    "NTRS": "Northern Trust", "CINF": "Cincinnati Financial", "ZION": "Zions",
+    "ERIE": "Erie Indemnity", "SOFI": "SoFi", "COIN": "Coinbase",
 }
 
 SYNTHETIC_SECTORS = ("Technology", "Financial Services", "Healthcare",

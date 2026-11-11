@@ -19,8 +19,19 @@ from data import client
 from factors import pipeline, scoring
 from factors.definitions import GROUPS, SUB_FACTORS, format_value
 from factors.sector import sector_summary
-from ui import factor_charts, snapshot_controls, theme
+from data import company as company_data
+from data.indexes import NASDAQ_100
+from ui import factor_charts, metric_views, snapshot_controls, theme
+from ui.metric_views import metric_values
 from ui.tables import search_mask
+
+# Universe choice → [(market snapshot, index restriction)]
+UNIVERSES: dict[str, list[tuple[str, str | None]]] = {
+    "KOSPI": [("KOSPI", None)],
+    "NASDAQ": [("NASDAQ", None)],
+    "Nasdaq-100": [("NASDAQ", NASDAQ_100)],
+    "Both": [("KOSPI", None), ("NASDAQ", None)],
+}
 
 st.set_page_config(page_title="Market Leaders", page_icon="🏆", layout="wide")
 theme.register_theme()
@@ -39,8 +50,12 @@ st.caption(
 default_all, default_stand = pipeline.get_thresholds()
 with st.sidebar:
     st.divider()
-    market_choice = st.radio("Market", ["KOSPI", "NASDAQ", "Both"], horizontal=True,
-                             key="ml_market")
+    market_choice = st.radio(
+        "Universe", list(UNIVERSES), horizontal=True, key="ml_market",
+        help="NASDAQ: the largest NASDAQ companies plus every Nasdaq-100 member. "
+             "Nasdaq-100: only the index's 100 companies, ranked among themselves. "
+             "Both: KOSPI + NASDAQ, each stock ranked within its own market.",
+    )
     rank_scope = st.radio(
         "Rank within", ["Market", "Sector"], horizontal=True, key="ml_scope",
         help="Sector: each stock is ranked only against its own sector (sector-neutral) — "
@@ -62,26 +77,35 @@ st.session_state["_leader_thresholds"] = (all_round, standout)
 # Score each market (holdings are added to KOSPI if not already peers)
 # ---------------------------------------------------------------------------
 source = pipeline.resolve_source()
-markets = ["KOSPI", "NASDAQ"] if market_choice == "Both" else [market_choice]
+universe = UNIVERSES[market_choice]
+markets = [market for market, _ in universe]
 holdings = client.get_holdings(kis_mode)
 held = set(holdings["ticker"])
 
-boards, overview_boards = [], []
-for market in markets:
+boards, overview_boards, index_problems = [], [], []
+for market, index in universe:
     extras = tuple(holdings["ticker"]) if market == "KOSPI" else ()
-    with st.spinner(f"Scoring {market}…"):
-        mb = pipeline.market_board(source, market, all_round, standout, rank_scope, extras)
+    try:
+        with st.spinner(f"Scoring {'Nasdaq-100' if index else market}…"):
+            mb = pipeline.market_board(source, market, all_round, standout, rank_scope,
+                                       extras, index=index)
+    except pipeline.IndexUnavailable as err:
+        index_problems.append(str(err))
+        snapshot_controls.peer_status(source, market, company_data.peers(source, market)[1])
+        continue
     snapshot_controls.peer_status(source, market, mb.meta if mb else None)
     if mb is None:
         continue
     boards.append(mb)
     # Sector comparisons need market-relative percentiles even in sector mode.
     overview_boards.append(mb if rank_scope == "market" else pipeline.market_board(
-        source, market, all_round, standout, "market", extras))
+        source, market, all_round, standout, "market", extras, index=index))
 
 if source == "synthetic":
     st.info("Synthetic demo data (forced in the sidebar) — every number is made up.", icon="🧪")
-missing = [m for m in markets if m not in {b.market for b in boards}]
+for problem in index_problems:
+    st.warning(problem, icon="⚠️")
+missing = [m for m in markets if m not in {b.market for b in boards} and not index_problems]
 if missing:
     st.info(f"No peer snapshot for {' and '.join(missing)} yet. Build it from the sidebar "
             "(a few minutes per market) or run `python -m data.snapshot --market "
@@ -95,11 +119,23 @@ for mb in boards:
     if mb.failed:
         st.warning(f"Couldn't fetch {len(mb.failed)} of your holdings, so they aren't ranked: "
                    + ", ".join(mb.failed))
+    ndx = mb.meta.get("indexes", {}).get(NASDAQ_100)
+    if mb.market == "NASDAQ" and ndx:
+        if "covered" not in ndx:
+            st.warning(f"Nasdaq-100 membership unavailable when this snapshot was built "
+                       f"({ndx.get('error', 'unknown error')}). Rebuild to include all members.")
+        elif ndx["covered"] < ndx["members"]:
+            st.warning(f"Nasdaq-100: **{ndx['covered']} of {ndx['members']}** members covered "
+                       f"— couldn't fetch {', '.join(ndx['missing'])}. Rebuild the snapshot to "
+                       "retry.", icon="⚠️")
+        else:
+            st.caption(f"✓ Nasdaq-100: all {ndx['members']} members covered · list from "
+                       f"{ndx['source']} as of {ndx['as_of']}.")
 
 board = pipeline.combine(boards)
-table = board.table.join(board.groups[list(GROUPS)]).join(
-    board.metrics[[c for c in ("ret_3M", "ret_12M") if c in board.metrics.columns]])
+table = board.table.join(board.groups[list(GROUPS)])
 table["held"] = table.index.isin(held) & (table["market"] == "KOSPI")
+table["ndx"] = np.where(table["in_ndx"].eq(True), "✓", "") if "in_ndx" in table else ""
 table["display_name"] = table["name_local"].where(
     (table["market"] == "KOSPI") & table["name_local"].notna(), table["name"]).fillna(table["name"])
 
@@ -151,36 +187,57 @@ with tab_board:
     if view.empty:
         st.info("No stocks match the current search and filters.")
     else:
-        shown = view.reset_index().rename(columns={"index": "ticker"})
+        columns_view = st.segmented_control(
+            "Columns", metric_views.VIEWS, default="Scores", key="ml_columns",
+            help="Scores: factor percentiles. Value / Growth / Momentum / Quality: that "
+                 "factor's key metric values plus its score. All metrics: every value.",
+        ) or "Scores"
+        shown = view.join(metric_values(board.metrics.loc[view.index]))
+        shown = shown.reset_index().rename(columns={"index": "ticker"})
         for col in (*GROUPS, "composite"):
             shown[col] = (shown[col] * 100).round(0)
         shown["held"] = np.where(shown["held"], "●", "")
-        # Scores first; descriptive extras (sector, scope, tags) to the right.
-        cols = ["rank", *(["market"] if len(markets) > 1 else []), "ticker", "display_name",
-                "composite", *GROUPS, "classification", "held", "sector",
-                *(["ranked_vs"] if rank_scope == "sector" else []), "standout_in", "tags"]
-        st.dataframe(
-            shown[cols], hide_index=True, width="stretch",
-            height=min(38 + 35 * len(shown), 560),
-            column_config={
-                "rank": st.column_config.NumberColumn(
-                    "#", format="%d", width="small", help="Composite rank within the "
-                    "stock's market (or sector, in sector mode)."),
-                "market": st.column_config.TextColumn("Market", width="small"),
-                "ticker": st.column_config.TextColumn("Ticker", width="small"),
-                "display_name": "Name", "sector": "Sector",
-                "ranked_vs": st.column_config.TextColumn("Ranked vs", width="small"),
-                "held": st.column_config.TextColumn("Held", width="small"),
-                "composite": st.column_config.NumberColumn("Composite", format="%d",
-                                                           width="small"),
-                **{g: st.column_config.NumberColumn(g, format="%d", width="small")
-                   for g in GROUPS},
-                "classification": "Leader", "standout_in": "Standout in", "tags": "Tags",
-            },
-        )
-        st.caption("Factor columns are percentiles (100 = best). Composite = mean of the four. "
-                   f"Blank = too little data (under {config.LEADER_MIN_COVERAGE:.0%} of a "
-                   "factor's inputs). ● = in your portfolio. Click a header to sort.")
+        lead = ["rank", *(["market"] if len(markets) > 1 else []), "ticker", "display_name"]
+        ndx_col = ["ndx"] if "NASDAQ" in markets and market_choice != "Nasdaq-100" else []
+        value_cols = [c.key for c in metric_views.view_columns(columns_view)]
+        if columns_view == "Scores":
+            # Scores first; descriptive extras (sector, scope, tags) to the right.
+            cols = [*lead, "composite", *GROUPS, "classification", "held", *ndx_col, "sector",
+                    *(["ranked_vs"] if rank_scope == "sector" else []), "standout_in", "tags"]
+        elif columns_view == "All metrics":
+            cols = [*lead, "composite", *value_cols, "classification", "sector"]
+        else:
+            cols = [*lead, columns_view, *value_cols, "classification", *ndx_col, "sector"]
+        config_cols = {
+            "rank": st.column_config.NumberColumn(
+                "#", format="%d", width="small", help="Composite rank within the "
+                "stock's market (or sector, in sector mode)."),
+            "market": st.column_config.TextColumn("Market", width="small"),
+            "ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "display_name": "Name", "sector": "Sector",
+            "ranked_vs": st.column_config.TextColumn("Ranked vs", width="small"),
+            "held": st.column_config.TextColumn("Held", width="small"),
+            "ndx": st.column_config.TextColumn("NDX", width="small",
+                                               help="✓ = Nasdaq-100 member"),
+            "composite": st.column_config.NumberColumn("Composite", format="%d",
+                                                       width="small"),
+            **{g: st.column_config.NumberColumn(
+                g if columns_view == "Scores" else f"{g} score", format="%d", width="small")
+               for g in GROUPS},
+            "classification": "Leader", "standout_in": "Standout in", "tags": "Tags",
+            **metric_views.column_config(columns_view),
+        }
+        st.dataframe(shown[cols], hide_index=True, width="stretch",
+                     height=min(38 + 35 * len(shown), 560), column_config=config_cols)
+        if columns_view == "Scores":
+            st.caption("Factor columns are percentiles (100 = best). Composite = mean of the "
+                       f"four. Blank = too little data (under {config.LEADER_MIN_COVERAGE:.0%} "
+                       "of a factor's inputs). ● = in your portfolio. Click a header to sort.")
+        else:
+            st.caption("Reported values from the peer snapshot (prices as of the snapshot "
+                       "date). *None* = not available, e.g. P/E for a loss-maker or P/B for "
+                       "negative equity. Hover a header for its definition; click to sort. "
+                       "Switch to *Scores* for percentile ranks.")
 
         st.subheader("Factor breakdown")
         options = list(view.index)
@@ -351,8 +408,15 @@ with tab_map:
 with st.expander("Methodology & data"):
     st.markdown(f"""
 **Universe.** The {config.PEER_TOP_N} largest companies by market cap in each market, from
-the daily peer snapshots (Yahoo Finance; see README). Your holdings are added to KOSPI if
-they aren't already in it. With *Both*, each stock is still ranked only within its own market.
+the daily peer snapshots (Yahoo Finance; see README). NASDAQ also always includes every
+Nasdaq-100 member (membership fetched from Nasdaq, falling back to Wikipedia, when the
+snapshot is built). *Nasdaq-100* ranks just the index's 100 companies among themselves.
+Your holdings are added to KOSPI if they aren't already in it. With *Both*, each stock is
+still ranked only within its own market.
+
+**Key metrics.** The *Columns* switch shows the reported values behind each factor score.
+P/E and P/B are shown for readability; the model ranks their inverses (earnings yield,
+book-to-market), which handle losses and negative equity cleanly.
 
 **Leader rules** (percentiles within the ranking scope)
 - **All-round leader** — every factor group ≥ {all_round:.0%}.
