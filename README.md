@@ -55,6 +55,10 @@ pages/
   3_Market_Leaders.py
   4_Company_Analysis.py
   5_Sector_ETFs.py
+  6_Dictionary.py
+glossary/
+  entries.py               # dictionary content (plain data: definition, formula, example…)
+  __init__.py              # lookup + search (English, abbreviations, Korean)
 ui/theme.py                # chart palette, Plotly template, shared chrome
 ui/factor_charts.py        # sub-factor chart shared by pages 3 & 4
 ui/snapshot_controls.py    # sidebar snapshot status + build button
@@ -64,6 +68,7 @@ tests/smoke_test.py        # engine + leader-screen checks (python -m tests.smok
 tests/test_company.py      # Yahoo parsing, freshness, ranking, snapshots (offline)
 tests/test_sectors.py      # sector ranking, search, ETF analytics, overrides (offline)
 tests/test_nasdaq100.py    # Nasdaq-100 parsing/coverage, key-metric values (offline)
+tests/test_glossary.py     # dictionary links, completeness, formulas, search
 ```
 
 ## Swapping in your own strategy
@@ -228,6 +233,28 @@ names, so each ETF links to its stocks. **The Korean codes (TIGER 200 sector
 series) are placeholders: verify them** using the *Name at source* column, or
 swap in your own.
 
+## Dictionary
+
+`pages/6_Dictionary.py` explains every term the app uses (about 100 entries):
+factors and scoring, each Value / Growth / Momentum / Quality metric, financial
+statement basics, market-leader rules, portfolio fields, backtest statistics,
+sectors and ETFs, and data concepts.
+
+- **Every entry** has a definition, its Korean name and aliases, and
+  clickable related concepts.
+- **Metrics** (P/E, P/B, ROE, ROIC, Sharpe, MDD, …) add what the metric
+  measures, the formula, a worked example, how to read it, and *In this app*:
+  exactly how the app computes it, including any free-data proxy.
+- **Search** works in English, by abbreviation (`PER`, `PBR`, `MDD`) or in
+  Korean (`주가순자산비율`, `샤프`), with a category filter and an A–Z list.
+- **Deep links:** link to any entry with `?term=<id>`, e.g. `/Dictionary?term=pb`.
+
+Content is plain data in `glossary/entries.py`. To add a term, append an
+`Entry` and reference related entries by id. `tests/test_glossary.py` fails
+if a link is broken, or if a metric you add to the scoring model
+(`factors/definitions.py`) or the metric columns (`ui/metric_views.py`) has no
+dictionary entry. Map new metric keys to entries in `glossary.FOR_METRIC`.
+
 ## Company Analysis (any KOSPI / NASDAQ company)
 
 `pages/4_Company_Analysis.py`: pick any KOSPI or NASDAQ listing (searchable,
@@ -326,9 +353,10 @@ python -m tests.smoke_test
 python -m tests.test_company
 python -m tests.test_sectors
 python -m tests.test_nasdaq100
+python -m tests.test_glossary
 ```
 
-All four run offline. `smoke_test` runs the synthetic generator through both reference strategies and the engine,
+All five run offline. `smoke_test` runs the synthetic generator through both reference strategies and the engine,
 asserting alignment, no-lookahead timing, and metric sanity. It also checks the
 leader screen: factor directions, negative-equity handling, the long-term-growth
 derivation, both leader rules, the coverage rule, and trend agreement.

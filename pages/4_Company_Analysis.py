@@ -258,6 +258,8 @@ st.dataframe(pd.DataFrame({
                    "Note": st.column_config.TextColumn("Note", width="large")})
 st.caption("Returns (incl. latest quote) — " + " · ".join(
     f"{k}: {theme.pct(returns.get(f'ret_{k}'), 1)}" for k in ("1M", "3M", "6M", "12M")))
+st.page_link("pages/6_Dictionary.py", icon="📖",
+             label="Definitions and formulas for every input → Dictionary")
 
 # ---------------------------------------------------------------------------
 # Price + peer context

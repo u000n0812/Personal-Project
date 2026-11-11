@@ -267,6 +267,7 @@ else:
     )
     st.caption("Reported values from the KOSPI peer snapshot; scores are percentiles vs the "
                "KOSPI universe. *None* = not available. Hover a header for its definition.")
+st.page_link("pages/6_Dictionary.py", icon="📖", label="Look up any term → Dictionary")
 
 # ---------------------------------------------------------------------------
 # Account NAV (only when the live endpoint provides it)

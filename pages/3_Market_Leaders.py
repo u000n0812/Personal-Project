@@ -238,6 +238,8 @@ with tab_board:
                        "date). *None* = not available, e.g. P/E for a loss-maker or P/B for "
                        "negative equity. Hover a header for its definition; click to sort. "
                        "Switch to *Scores* for percentile ranks.")
+        st.page_link("pages/6_Dictionary.py", icon="📖",
+                     label="What each metric measures and how it's calculated → Dictionary")
 
         st.subheader("Factor breakdown")
         options = list(view.index)

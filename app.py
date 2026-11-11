@@ -66,6 +66,13 @@ st.write(
 )
 st.page_link("pages/5_Sector_ETFs.py", label="Open Sector ETFs →")
 
+st.subheader("📖 Dictionary")
+st.write(
+    "Every term used in the app, with definitions, formulas and worked examples for "
+    "metrics like P/E and P/B, and links between related concepts."
+)
+st.page_link("pages/6_Dictionary.py", label="Open Dictionary →")
+
 st.divider()
 st.markdown(
     f"""
