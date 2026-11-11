@@ -58,6 +58,11 @@ class SyntheticProvider:
                               for t in tickers})
         return frame.sort_index()
 
+    def raw_closes(self, symbols: list[str], start: pd.Timestamp) -> pd.DataFrame:
+        end = pd.Timestamp.today().normalize()
+        return pd.DataFrame({s: synthetic.generate_ohlcv(s, start, end)["close"]
+                             for s in symbols}).sort_index()
+
     def quote(self, ticker: str, market: str) -> Quote:
         close = self.closes([ticker], market, pd.Timestamp.today() - pd.Timedelta(days=14))[ticker]
         close = close.dropna()

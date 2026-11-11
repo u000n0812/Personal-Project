@@ -12,6 +12,7 @@ yfinance>=1.0
 finance-datareader>=0.9.90
 requests>=2.31         # Nasdaq-100 membership (Nasdaq / Wikipedia)
 beautifulsoup4>=4.12   # Wikipedia fallback parser
+vaderSentiment>=3.3    # English text sentiment (Sentiment page)
 # PyKis - KIS Open API wrapper (import name: `pykis`). Only needed for live
 # mode; the app runs fully on synthetic data without it.
 python-kis>=2.0

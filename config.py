@@ -96,6 +96,21 @@ SNAPSHOT_STALE_DAYS: int = 5  # warn when the peer snapshot is older than this
 MIN_SECTOR_SIZE: int = 5
 
 # ---------------------------------------------------------------------------
+# Sentiment page
+# ---------------------------------------------------------------------------
+# Reddit's official API needs a free "script" app (reddit.com/prefs/apps).
+# Without these the Reddit source is shown as unavailable; others still work.
+REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET", "")
+REDDIT_SUBREDDITS: tuple[str, ...] = ("stocks", "investing", "wallstreetbets", "StockMarket")
+SENTIMENT_DIR: Path = Path(os.getenv("SENTIMENT_DIR", str(Path(__file__).parent / "data" / "sentiment")))
+# Tickers the collector records daily (python -m sentiment.collect), per market.
+SENTIMENT_WATCHLIST: dict[str, tuple[str, ...]] = {
+    "KOSPI": ("005930", "000660"),
+    "NASDAQ": ("NVDA", "AAPL", "MSFT"),
+}
+
+# ---------------------------------------------------------------------------
 # Sector ETFs page. Sector keys use Yahoo's sector names so each ETF links to
 # the matching stocks on the Market Leaders page.
 #

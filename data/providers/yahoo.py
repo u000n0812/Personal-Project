@@ -271,6 +271,18 @@ class YahooProvider:
         close.index = pd.DatetimeIndex(close.index).tz_localize(None).normalize()
         return close.reindex(columns=tickers).sort_index()
 
+    def raw_closes(self, symbols: list[str], start: pd.Timestamp) -> pd.DataFrame:
+        """Closes for raw Yahoo symbols (indices, FX, ETFs: ^VIX, KRW=X, SPY…)."""
+        raw = self.yf.download(list(symbols), start=pd.Timestamp(start).date(), auto_adjust=True,
+                               progress=False, threads=True, multi_level_index=True)
+        if raw is None or raw.empty:
+            return pd.DataFrame(columns=list(symbols), dtype=float)
+        close = raw["Close"]
+        if isinstance(close, pd.Series):
+            close = close.to_frame(symbols[0])
+        close.index = pd.DatetimeIndex(close.index).tz_localize(None).normalize()
+        return close.reindex(columns=list(symbols)).sort_index()
+
     def quote(self, ticker: str, market: str) -> Quote:
         t = self.yf.Ticker(yahoo_symbol(ticker, market))
         daily = t.history(period="10d", interval="1d", auto_adjust=False)

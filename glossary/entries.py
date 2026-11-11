@@ -54,9 +54,10 @@ PORTFOLIO = "Portfolio"
 SECTORS = "Sectors & ETFs"
 DATA = "Markets & data"
 BASICS = "Financial statement basics"
+SENTIMENT = "Sentiment"
 
 CATEGORIES = (FACTORS, VALUE, GROWTH, MOMENTUM, QUALITY, LEADERS, BASICS,
-              PORTFOLIO, BACKTEST, SECTORS, DATA)
+              PORTFOLIO, BACKTEST, SECTORS, SENTIMENT, DATA)
 
 
 ENTRIES: tuple[Entry, ...] = (
@@ -1217,6 +1218,261 @@ ENTRIES: tuple[Entry, ...] = (
         example="A margin going from 10% to 12% is +2 percentage points, but a +20% "
                 "relative increase.",
         related=("basis-point", "op-margin-change", "relative-strength"),
+    ),
+    # =====================================================================
+    # Sentiment
+    # =====================================================================
+    Entry(
+        "fear-greed-index", "Fear & Greed index", SENTIMENT,
+        aliases=("fear and greed", "F&G", "market mood"), korean="공포·탐욕 지수",
+        definition="A 0–100 gauge of market-wide investor emotion: 0 = extreme fear, "
+                   "100 = extreme greed. Fear drives selling below fair value; greed bids "
+                   "prices up.",
+        measures="The overall mood of a market — not about any single company.",
+        formula=r"\text{F\&G} = \frac{1}{k}\sum_{j=1}^{k}\text{Percentile}_{252d}(c_j)",
+        example="If momentum sits at its 80th percentile of the past year, volatility at "
+                "40, safe-haven demand at 60 and junk-bond demand at 70, the index is 62.5 "
+                "(greed).",
+        interpret="Bands: <25 extreme fear, 25–45 fear, 45–55 neutral, 55–75 greed, >75 "
+                  "extreme greed. Extremes are often read contrarily.",
+        in_app="Built per market from Yahoo prices. US: S&P 500 momentum and strength, "
+               "VIX, stocks vs Treasuries, junk vs investment-grade bonds, equal- vs "
+               "cap-weight. Korea: KOSPI momentum and strength, realized volatility, the "
+               "won (USD/KRW), KOSDAQ vs KOSPI. CNN's index is shown as a US cross-check.",
+        related=("sentiment-index", "vix", "safe-haven-demand", "contrarian-indicator",
+                 "percentile-rank"),
+    ),
+    Entry(
+        "sentiment-index", "Stock sentiment index", SENTIMENT,
+        aliases=("investor sentiment score", "company sentiment", "sentiment score"),
+        korean="종목 투자심리 지수",
+        definition="A 0–100 measure of how investors feel about one company, combining "
+                   "independent source families.",
+        measures="Company-level investor psychology across communities, news, analysts, "
+                 "trader positioning and relative price behavior.",
+        formula=r"\text{Index} = 50 + 50 \times \frac{1}{F}\sum_{f=1}^{F}"
+                r"\overline{s_f \cdot \tfrac{n}{n+10}}",
+        example="Family scores (after shrinkage) of +0.5, +0.3, +0.4, +0.2 and −0.2 average "
+                "+0.24 → index 62 (greed).",
+        interpret="Read it next to market mood: the gap shows the company-specific part. "
+                  "Check coverage and agreement before trusting it.",
+        in_app="Investor Sentiment page and Company Analysis. Families are weighted "
+               "equally; each reading is shrunk toward neutral by its evidence.",
+        related=("sentiment-families", "shrinkage", "relative-sentiment", "fear-greed-index",
+                 "source-agreement"),
+    ),
+    Entry(
+        "sentiment-families", "Sentiment source families", SENTIMENT,
+        aliases=("Crowd", "News", "Positioning", "source families"), korean="심리 데이터 계열",
+        definition="Groups of independent evidence about a stock: Crowd (StockTwits, "
+                   "Reddit), News (headline tone), Analysts (ratings and their trend), "
+                   "Positioning (options, short interest, Korean investor flows) and Price "
+                   "(behavior relative to the market).",
+        interpret="Averaging within a family first, then across families, keeps one noisy "
+                  "or biased source from dominating — e.g. two chat sites can't outvote "
+                  "analysts and prices.",
+        related=("sentiment-index", "shrinkage", "source-agreement", "sentiment-sources"),
+    ),
+    Entry(
+        "shrinkage", "Shrinkage toward neutral", SENTIMENT,
+        aliases=("evidence weight", "Weight"), korean="중립 수축 (증거 가중)",
+        definition="Pulling a reading toward neutral when it rests on little evidence, so "
+                   "small samples can't swing the composite.",
+        formula=r"s_{adj} = s \times \frac{n}{n + 10}",
+        example="Three bullish posts (s = +1, n = 3) → +1 × 3/13 ≈ +0.23. Thirty (n = 30) "
+                "→ +0.75.",
+        in_app="Shown as the 'Weight' column in the Sources table.",
+        related=("sentiment-index", "sentiment-families"),
+    ),
+    Entry(
+        "bull-bear-ratio", "Bullish share (bull/bear ratio)", SENTIMENT,
+        aliases=("bullish percentage", "bull ratio", "bullish vs bearish"),
+        korean="강세 비율",
+        definition="The share of opinionated posts and headlines that are bullish.",
+        formula=r"\text{Bullish share} = \frac{\#\text{bullish}}{\#\text{bullish} + "
+                r"\#\text{bearish}}",
+        example="45 bullish and 15 bearish items → 75% bullish (a 3:1 bull/bear ratio).",
+        interpret="Above 50% = more bulls. Neutral items are excluded. StockTwits users tag "
+                  "their own posts; other items are classified by text tone.",
+        related=("lexicon-sentiment", "sentiment-index", "contrarian-indicator"),
+    ),
+    Entry(
+        "attention", "Attention (social & news volume)", SENTIMENT,
+        aliases=("social media trend", "buzz", "mention volume"), korean="관심도 (언급량)",
+        definition="How much a stock is being talked about now compared with usual.",
+        formula=r"\text{Attention} = \frac{\text{items in last 24h}}"
+                r"{\text{average items per day over 7 days}}",
+        example="12 posts and headlines today vs an average of 4 a day → 3.0×.",
+        interpret="Spikes often accompany news or price moves; attention is about intensity, "
+                  "not direction.",
+        in_app="Shown as a KPI and as the daily-volume chart on the Investor Sentiment page.",
+        related=("bull-bear-ratio", "sentiment-index"),
+    ),
+    Entry(
+        "source-agreement", "Source agreement", SENTIMENT,
+        aliases=("dispersion", "mixed signals", "coverage"), korean="출처 간 일치도",
+        definition="How closely the source families agree, measured by the spread of their "
+                   "scores; coverage is how many families had data.",
+        interpret="Spread < 0.25 'sources agree', 0.25–0.5 'mixed signals', > 0.5 'sources "
+                  "conflict'. Fewer than two families = low coverage.",
+        related=("sentiment-index", "sentiment-families"),
+    ),
+    Entry(
+        "relative-sentiment", "Sentiment vs market", SENTIMENT,
+        aliases=("company-specific sentiment", "gap to market"), korean="시장 대비 심리",
+        definition="A stock's sentiment index minus its market's Fear & Greed index — the "
+                   "part of the mood that is about the company rather than the market.",
+        formula=r"\text{Gap} = \text{Stock index} - \text{Market F\&G}",
+        example="Stock at 68 while the market reads 52 → +16 points: investors are "
+                "notably more upbeat about this company than the market overall.",
+        related=("sentiment-index", "fear-greed-index", "relative-price-behavior"),
+    ),
+    Entry(
+        "relative-price-behavior", "Price behavior vs market", SENTIMENT,
+        aliases=("relative price", "Price family"), korean="시장 대비 주가 흐름",
+        definition="How a stock trades relative to its market index, computed on the ratio "
+                   "stock ÷ index so the market's own move is removed.",
+        formula=r"s = \tfrac{1}{3}\Big(\tfrac{\text{RSI}_{14}(R) - 50}{50} + "
+                r"(2\,\text{pos}_{52w}(R) - 1) + \text{clip}\big(\tfrac{R/\text{MA}_{50}(R) - 1}"
+                r"{0.10}\big)\Big),\ R = \tfrac{P}{\text{Index}}",
+        interpret="A stock rising only because the market rises reads neutral; one rising "
+                  "while the market falls reads bullish.",
+        in_app="The Price family on the Investor Sentiment page; benchmark ^IXIC for "
+               "NASDAQ, ^KS11 for KOSPI. Its history is rebuilt from prices.",
+        related=("rsi", "relative-sentiment", "relative-strength"),
+    ),
+    Entry(
+        "rsi", "Relative Strength Index (RSI)", SENTIMENT, aliases=("RSI",),
+        korean="상대강도지수 (RSI)",
+        definition="A momentum oscillator from 0 to 100 comparing recent gains with recent "
+                   "losses.",
+        measures="Whether buying or selling pressure has dominated lately — "
+                 "'overbought' or 'oversold' conditions.",
+        formula=r"\text{RSI} = 100 - \frac{100}{1 + \frac{\text{avg gain}_{14}}"
+                r"{\text{avg loss}_{14}}}",
+        example="Average daily gain 1.5% and average loss 0.5% over 14 days → RS = 3 → "
+                "RSI = 100 − 100/4 = 75.",
+        interpret="Above 70 is commonly called overbought, below 30 oversold.",
+        in_app="Computed (Wilder smoothing) on the stock ÷ index ratio as part of price "
+               "behavior vs market.",
+        related=("relative-price-behavior", "price-momentum"),
+    ),
+    Entry(
+        "put-call-ratio", "Put/call ratio", SENTIMENT, aliases=("PCR", "options put/call"),
+        korean="풋/콜 비율",
+        definition="Put options traded divided by call options traded. Puts profit when a "
+                   "stock falls, calls when it rises.",
+        measures="How traders are positioning with real money: hedging or betting on "
+                 "declines vs betting on gains.",
+        formula=r"\text{PCR} = \frac{\text{Put volume}}{\text{Call volume}},\quad "
+                r"s = \text{clip}\Big(-\frac{\ln(\text{PCR}/0.7)}{\ln 3}\Big)",
+        example="12,000 puts and 20,000 calls → PCR 0.6, slightly below the typical 0.7 → "
+                "mildly bullish (s ≈ +0.14).",
+        interpret="Higher = more bearish positioning. Very high readings can mark capitulation.",
+        in_app="US stocks: the two nearest expiries from Yahoo option chains; falls back to "
+               "open interest when volume is thin.",
+        related=("short-interest", "sentiment-families", "contrarian-indicator"),
+    ),
+    Entry(
+        "short-interest", "Short interest", SENTIMENT,
+        aliases=("short % of float", "shares short"), korean="공매도 잔고",
+        definition="Shares sold short and not yet bought back, often as a percentage of the "
+                   "shares available to trade (float).",
+        measures="How many investors are betting on a decline.",
+        formula=r"\text{Short \% of float} = \frac{\text{Shares sold short}}"
+                r"{\text{Float}}",
+        example="30 million shares short on a 600 million float → 5%.",
+        interpret="High or rising = bearish positioning (and potential for a short squeeze).",
+        in_app="US stocks, from Yahoo: level (5% neutral, 15% very bearish) and change vs "
+               "the prior month, averaged. Reported twice a month, so it moves slowly.",
+        related=("put-call-ratio", "sentiment-families"),
+    ),
+    Entry(
+        "investor-flows", "Investor flows (foreign / institutional)", SENTIMENT,
+        aliases=("foreign net buying", "institutional net buying", "수급"),
+        korean="투자자별 수급 (외국인·기관 순매수)",
+        definition="Net buying or selling of a Korean stock by investor type — foreigners, "
+                   "institutions and individuals — as reported by the exchange.",
+        measures="Whether larger, typically better-informed investors are accumulating or "
+                 "distributing the stock.",
+        formula=r"s = \frac{\sum (\text{Foreign} + \text{Institutional net buy})}"
+                r"{\sum (|\text{Foreign}| + |\text{Institutional}|)}\ \text{(20 days)}",
+        example="Over 20 days foreigners net bought 3.0M shares and institutions net sold "
+                "1.0M, with gross 4.0M → s = +0.5.",
+        interpret="Positive = foreigners and institutions net buying. Retail flows are shown "
+                  "but not scored; in Korea they are often read contrarily.",
+        in_app="KOSPI stocks via the KIS Open API (needs your keys in .env).",
+        related=("foreign-ownership-change", "kis-api", "sentiment-families"),
+    ),
+    Entry(
+        "analyst-rating-score", "Analyst rating score", SENTIMENT,
+        aliases=("recommendation trend", "upgrades and downgrades"), korean="애널리스트 투자의견 점수",
+        definition="A score from analysts' buy/hold/sell ratings, blended with how those "
+                   "ratings changed over three months.",
+        formula=r"\text{level} = \frac{2\,SB + B - S - 2\,SS}{2N},\quad "
+                r"s = \tfrac{1}{2}\text{level} + \tfrac{1}{2}\text{clip}(4\,\Delta_{3M}\text{level})",
+        example="10 strong buys, 15 buys, 5 holds (N = 30) → level 0.58; if it was 0.48 three "
+                "months ago, Δ = +0.10 → trend +0.4 → s ≈ 0.49.",
+        interpret="Sell-side ratings skew bullish, so the trend carries half the weight.",
+        in_app="From Yahoo recommendations; recent upgrades and downgrades are listed in the "
+               "detail.",
+        related=("consensus", "eps-revision", "sentiment-families"),
+    ),
+    Entry(
+        "vix", "VIX", SENTIMENT, aliases=("volatility index", "fear gauge"),
+        korean="VIX (변동성 지수)",
+        definition="The market's expectation of S&P 500 volatility over the next 30 days, "
+                   "implied by option prices — Wall Street's 'fear gauge'.",
+        interpret="Rising VIX = rising fear. Long-run average roughly 19–20.",
+        in_app="A US Fear & Greed component: VIX vs its 50-day average.",
+        related=("fear-greed-index", "volatility"),
+    ),
+    Entry(
+        "safe-haven-demand", "Safe-haven demand", SENTIMENT,
+        aliases=("junk bond demand", "risk appetite"), korean="안전자산 선호",
+        definition="Whether investors favor safe assets (Treasuries, a strong home currency) "
+                   "over risky ones (stocks, junk bonds, small caps).",
+        formula=r"c = r_{20d}(\text{stocks}) - r_{20d}(\text{Treasuries})",
+        example="Stocks +3% and Treasuries +1% over 20 days → +2 pp: risk appetite.",
+        in_app="US components: SPY − TLT, HYG − LQD. Korea: the won vs the dollar and "
+               "KOSDAQ − KOSPI.",
+        related=("fear-greed-index", "vix"),
+    ),
+    Entry(
+        "lexicon-sentiment", "Text sentiment (lexicon)", SENTIMENT,
+        aliases=("VADER", "headline tone", "tone"), korean="텍스트 감성 분석",
+        definition="Scoring the tone of text by matching words against a dictionary of "
+                   "positive and negative terms.",
+        example="'Shares plunge after guidance cut' scores −0.66; 'beats earnings, rallies "
+                "to record high' scores +0.81.",
+        interpret="Transparent and reproducible, but it misses sarcasm and some negation.",
+        in_app="English: VADER plus a finance vocabulary (stock VADER rates 'beats earnings, "
+               "rallies to record high' as neutral). Korean: finance stems such as 상승/하락 "
+               "and 호재/악재. Headlines are de-duplicated and capped at 3 per outlet.",
+        related=("bull-bear-ratio", "sentiment-sources"),
+    ),
+    Entry(
+        "contrarian-indicator", "Contrarian indicator", SENTIMENT, korean="역발상 지표",
+        definition="A signal read in the opposite direction: when nearly everyone is "
+                   "bullish, there may be few buyers left, and vice versa.",
+        interpret="Extreme greed or fear in sentiment measures has often preceded "
+                  "reversals — one reason sentiment is supplementary, not a trading signal "
+                  "on its own.",
+        related=("fear-greed-index", "bull-bear-ratio", "put-call-ratio"),
+    ),
+    Entry(
+        "sentiment-sources", "Sentiment data sources", SENTIMENT,
+        aliases=("StockTwits", "Reddit", "Google News", "CNN Fear & Greed"),
+        korean="심리 데이터 출처",
+        definition="Where the sentiment readings come from: StockTwits (users tag posts "
+                   "bullish/bearish), Reddit (r/stocks, r/investing, r/wallstreetbets, "
+                   "r/StockMarket), Google News headlines, Yahoo Finance (analysts, options, "
+                   "short interest, prices), the KIS Open API (Korean investor flows) and "
+                   "CNN's Fear & Greed index (US cross-check).",
+        in_app="Reddit needs free API keys (REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET in .env); "
+               "KIS flows need your KIS keys. Missing sources are shown as unavailable, never "
+               "filled in.",
+        related=("sentiment-families", "lexicon-sentiment", "kis-api", "yahoo-finance"),
     ),
     Entry(
         "basis-point", "Basis point (bp)", DATA, aliases=("bps", "bp"),

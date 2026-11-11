@@ -66,6 +66,14 @@ st.write(
 )
 st.page_link("pages/5_Sector_ETFs.py", label="Open Sector ETFs →")
 
+st.subheader("🧭 Investor Sentiment")
+st.write(
+    "Market Fear & Greed for the US and Korea, plus company-specific sentiment from crowd, "
+    "news, analyst, positioning and price signals — balanced across sources and tracked "
+    "over time."
+)
+st.page_link("pages/7_Sentiment.py", label="Open Investor Sentiment →")
+
 st.subheader("📖 Dictionary")
 st.write(
     "Every term used in the app, with definitions, formulas and worked examples for "

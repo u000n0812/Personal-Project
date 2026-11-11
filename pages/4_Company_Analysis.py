@@ -23,7 +23,7 @@ from factors.company import score_company
 from factors.definitions import GROUPS, format_value
 from factors.price import trailing_returns
 from data.fundamentals import apply_overrides
-from ui import factor_charts, snapshot_controls, theme
+from ui import factor_charts, sentiment_views, snapshot_controls, theme
 
 st.set_page_config(page_title="Company Analysis", page_icon="🔎", layout="wide")
 theme.register_theme()
@@ -295,6 +295,23 @@ st.dataframe(
                    "classification": "Leader",
                    **{g: st.column_config.NumberColumn(g, format="%d") for g in GROUPS}},
 )
+
+# ---------------------------------------------------------------------------
+# Investor sentiment (supplementary; full view on the Sentiment page)
+# ---------------------------------------------------------------------------
+st.subheader("Investor sentiment")
+try:
+    mood = sentiment_views.market_mood(source, market)
+    feel = sentiment_views.stock_mood(source, ticker, market, info.name,
+                                      names.get(ticker, info.name))
+    sentiment_views.compact_card(feel, mood)
+    st.caption("Market mood is market-wide; stock sentiment combines crowd, news, analyst, "
+               "positioning and relative-price signals. Supplementary — not a forecast.")
+except Exception as err:  # noqa: BLE001 — sentiment must never break the factor view
+    st.caption(f"Sentiment unavailable right now ({type(err).__name__}).")
+if st.button("Open full sentiment analysis →", icon="🧭"):
+    st.session_state["_sentiment_target"] = (market, ticker)
+    st.switch_page("pages/7_Sentiment.py")
 
 # ---------------------------------------------------------------------------
 # Provenance

@@ -8,6 +8,7 @@ A provider supplies four things for a market ("KOSPI" | "NASDAQ"):
 - ``quote(ticker, market)``     → Quote (latest price + timestamp)
 - ``security_names(tickers, market)`` → {ticker: name at the source}
 - ``index_members(index)``       → data.indexes.Members (e.g. "NDX" = Nasdaq-100)
+- ``raw_closes(symbols, start)``  → closes for raw symbols (indices, FX, ETFs)
 
 Factor inputs follow ``factors.definitions.FUNDAMENTAL_COLUMNS`` (fractions).
 To add a data vendor, implement these four methods and register the class in
@@ -64,6 +65,7 @@ class Provider(Protocol):
     def quote(self, ticker: str, market: str) -> Quote: ...
     def security_names(self, tickers: list[str], market: str) -> dict[str, str]: ...
     def index_members(self, index: str): ...
+    def raw_closes(self, symbols: list[str], start: pd.Timestamp) -> pd.DataFrame: ...
 
 
 def _session(market: str) -> tuple[ZoneInfo, time, time]:

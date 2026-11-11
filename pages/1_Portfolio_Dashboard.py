@@ -16,7 +16,8 @@ from data import client
 from factors import pipeline as leader_pipeline
 from factors.definitions import GROUPS
 from strategies import carry as carry_mod
-from ui import metric_views, theme
+from sentiment.model import band as sentiment_band
+from ui import metric_views, sentiment_views, theme
 from ui.metric_views import metric_values
 
 st.set_page_config(page_title="Portfolio Dashboard", page_icon="📊", layout="wide")
@@ -112,6 +113,13 @@ k4.metric(
          f"({(holdings.leader != '').sum()} of {len(holdings)} positions). "
          "See the Market Leaders page.",
 )
+try:  # market mood is context for the whole portfolio; never let it break the page
+    kr_mood = sentiment_views.market_mood(leader_pipeline.resolve_source(), "KOSPI")
+    st.caption(f"🧭 Market mood · KOSPI Fear & Greed **{kr_mood.latest:.0f}** "
+               f"({sentiment_band(kr_mood.latest).lower()}, {kr_mood.change(5):+.0f} over a "
+               "week) — details on the Investor Sentiment page.")
+except Exception:  # noqa: BLE001
+    pass
 
 st.divider()
 
