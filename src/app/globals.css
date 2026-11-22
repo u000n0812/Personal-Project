@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #100c22;
+  --color-surface: #191333;
+  --color-surface-2: #211a42;
+  --color-ink: #efeaff;
+  --color-ink-dim: #a89fd6;
+  --color-ink-faint: #756c9e;
+  --color-accent: #a48af0;
+  --color-accent-strong: #7c5ce0;
+  --color-gold: #e0b768;
+  --color-line: #33284f;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-ink: var(--color-ink);
+  --color-ink-dim: var(--color-ink-dim);
+  --color-ink-faint: var(--color-ink-faint);
+  --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
+  --color-gold: var(--color-gold);
+  --color-line: var(--color-line);
+  --font-serif: var(--font-noto-serif-kr);
+  --font-sans: var(--font-noto-sans-kr);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans), "Pretendard", -apple-system, sans-serif;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(164, 138, 240, 0.16), transparent 45%),
+    radial-gradient(circle at 100% 20%, rgba(224, 183, 104, 0.08), transparent 40%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--color-accent-strong);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-color: var(--color-line) transparent;
+}
